@@ -55,13 +55,22 @@ fi
 echo -e "${GREEN}✅ Latest version: $LATEST_VERSION${NC}"
 
 # Installation method selection
-echo ""
-echo -e "${BLUE}📦 Choose installation method:${NC}"
-echo "1) Docker (Recommended)"
-echo "2) Binary installation"
-echo "3) Docker Compose"
-echo ""
-read -p "Enter your choice (1-3): " INSTALL_METHOD
+if [ -n "$1" ]; then
+    INSTALL_METHOD="$1"
+else
+    echo ""
+    echo -e "${BLUE}📦 Choose installation method:${NC}"
+    echo "1) Docker (Recommended)"
+    echo "2) Binary installation"
+    echo "3) Docker Compose"
+    echo ""
+    if [ -t 0 ]; then
+        read -p "Enter your choice (1-3): " INSTALL_METHOD
+    else
+        echo -e "${YELLOW}⚠️  No interactive input detected. Defaulting to Docker (1).${NC}"
+        INSTALL_METHOD=1
+    fi
+fi
 
 case $INSTALL_METHOD in
     1)
