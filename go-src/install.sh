@@ -2,7 +2,7 @@
 set -e
 
 # Coolify Go Port - Installation Script
-# Usage: curl -fsSL https://raw.githubusercontent.com/s3ig8u/coolify/main/go-src/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/s3ig8u/coolify/v4.x/go-src/install.sh | bash
 
 REPO="s3ig8u/coolify"
 REGISTRY="ghcr.io/s3ig8u/coolify-go"

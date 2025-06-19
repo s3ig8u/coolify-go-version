@@ -9,10 +9,10 @@ A Go-based port of Coolify - an open-source & self-hostable alternative to Herok
 ### One-Line Installation
 ```bash
 # Install latest version
-curl -fsSL https://raw.githubusercontent.com/s3ig8u/coolify/main/go-src/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/s3ig8u/coolify/v4.x/go-src/install.sh | bash
 
 # Or update existing installation
-curl -fsSL https://raw.githubusercontent.com/s3ig8u/coolify/main/go-src/update.sh | bash
+curl -fsSL https://raw.githubusercontent.com/s3ig8u/coolify/v4.x/go-src/update.sh | bash
 ```
 
 ### Alternative Installation Methods
