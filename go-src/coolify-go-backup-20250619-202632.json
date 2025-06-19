@@ -1,0 +1,260 @@
+[
+    {
+        "Id": "073e826fa1cb4ef309eee9c5e5fda96d1f563f376ef48326d0228585278a2c14",
+        "Created": "2025-06-19T19:23:22.337181759Z",
+        "Path": "./coolify-go",
+        "Args": [],
+        "State": {
+            "Status": "running",
+            "Running": true,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 24836,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2025-06-19T19:23:22.393120342Z",
+            "FinishedAt": "0001-01-01T00:00:00Z",
+            "Health": {
+                "Status": "healthy",
+                "FailingStreak": 0,
+                "Log": [
+                    {
+                        "Start": "2025-06-19T19:24:27.56723347Z",
+                        "End": "2025-06-19T19:24:27.605312136Z",
+                        "ExitCode": 0,
+                        "Output": "Connecting to localhost:8080 ([::1]:8080)\nremote file exists\n"
+                    },
+                    {
+                        "Start": "2025-06-19T19:24:57.606956386Z",
+                        "End": "2025-06-19T19:24:57.645481595Z",
+                        "ExitCode": 0,
+                        "Output": "Connecting to localhost:8080 ([::1]:8080)\nremote file exists\n"
+                    },
+                    {
+                        "Start": "2025-06-19T19:25:27.646611095Z",
+                        "End": "2025-06-19T19:25:27.675251678Z",
+                        "ExitCode": 0,
+                        "Output": "Connecting to localhost:8080 ([::1]:8080)\nremote file exists\n"
+                    },
+                    {
+                        "Start": "2025-06-19T19:25:57.676531595Z",
+                        "End": "2025-06-19T19:25:57.713453386Z",
+                        "ExitCode": 0,
+                        "Output": "Connecting to localhost:8080 ([::1]:8080)\nremote file exists\n"
+                    },
+                    {
+                        "Start": "2025-06-19T19:26:27.720918178Z",
+                        "End": "2025-06-19T19:26:27.760969803Z",
+                        "ExitCode": 0,
+                        "Output": "Connecting to localhost:8080 ([::1]:8080)\nremote file exists\n"
+                    }
+                ]
+            }
+        },
+        "Image": "sha256:8a0648320e5769cb2a10bb134a110d06a129f9c7faf7e96a777ea92f58dc9f4a",
+        "ResolvConfPath": "/var/lib/docker/containers/073e826fa1cb4ef309eee9c5e5fda96d1f563f376ef48326d0228585278a2c14/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/073e826fa1cb4ef309eee9c5e5fda96d1f563f376ef48326d0228585278a2c14/hostname",
+        "HostsPath": "/var/lib/docker/containers/073e826fa1cb4ef309eee9c5e5fda96d1f563f376ef48326d0228585278a2c14/hosts",
+        "LogPath": "/var/lib/docker/containers/073e826fa1cb4ef309eee9c5e5fda96d1f563f376ef48326d0228585278a2c14/073e826fa1cb4ef309eee9c5e5fda96d1f563f376ef48326d0228585278a2c14-json.log",
+        "Name": "/coolify-go",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": null,
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {}
+            },
+            "NetworkMode": "bridge",
+            "PortBindings": {
+                "8080/tcp": [
+                    {
+                        "HostIp": "",
+                        "HostPort": "8080"
+                    }
+                ]
+            },
+            "RestartPolicy": {
+                "Name": "unless-stopped",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                48,
+                136
+            ],
+            "CapAdd": null,
+            "CapDrop": null,
+            "CgroupnsMode": "private",
+            "Dns": [],
+            "DnsOptions": [],
+            "DnsSearch": [],
+            "ExtraHosts": null,
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": null,
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 0,
+            "NanoCpus": 0,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": [],
+            "BlkioDeviceReadBps": [],
+            "BlkioDeviceWriteBps": [],
+            "BlkioDeviceReadIOps": [],
+            "BlkioDeviceWriteIOps": [],
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": [],
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "MemoryReservation": 0,
+            "MemorySwap": 0,
+            "MemorySwappiness": null,
+            "OomKillDisable": null,
+            "PidsLimit": null,
+            "Ulimits": [],
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "MaskedPaths": [
+                "/proc/asound",
+                "/proc/acpi",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/sys/firmware",
+                "/sys/devices/virtual/powercap"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "GraphDriver": {
+            "Data": {
+                "LowerDir": "/var/lib/docker/overlay2/e05bf66a43c16e9d1258f376060b1683ecd27eaf420c4fa33f6f3a35a75a313d-init/diff:/var/lib/docker/overlay2/20bn4erm5v6a3c9fqs9d6xgvi/diff:/var/lib/docker/overlay2/4mqaveu8b0kdrphkxjm9bhslq/diff:/var/lib/docker/overlay2/bvdqfgmnxycpa8webgkos9u8e/diff:/var/lib/docker/overlay2/ff636aca6a18dc8d286d233087f3018e29a5631613c4627e75d01f2380cdac36/diff",
+                "MergedDir": "/var/lib/docker/overlay2/e05bf66a43c16e9d1258f376060b1683ecd27eaf420c4fa33f6f3a35a75a313d/merged",
+                "UpperDir": "/var/lib/docker/overlay2/e05bf66a43c16e9d1258f376060b1683ecd27eaf420c4fa33f6f3a35a75a313d/diff",
+                "WorkDir": "/var/lib/docker/overlay2/e05bf66a43c16e9d1258f376060b1683ecd27eaf420c4fa33f6f3a35a75a313d/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [],
+        "Config": {
+            "Hostname": "073e826fa1cb",
+            "Domainname": "",
+            "User": "",
+            "AttachStdin": false,
+            "AttachStdout": false,
+            "AttachStderr": false,
+            "ExposedPorts": {
+                "8080/tcp": {}
+            },
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "GO_ENV=staging",
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            ],
+            "Cmd": [
+                "./coolify-go"
+            ],
+            "Healthcheck": {
+                "Test": [
+                    "CMD-SHELL",
+                    "wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1"
+                ],
+                "Interval": 30000000000,
+                "Timeout": 3000000000,
+                "StartPeriod": 5000000000,
+                "Retries": 3
+            },
+            "Image": "coolify-go:v1.1.0",
+            "Volumes": null,
+            "WorkingDir": "/root/",
+            "Entrypoint": null,
+            "OnBuild": null,
+            "Labels": {}
+        },
+        "NetworkSettings": {
+            "Bridge": "",
+            "SandboxID": "29b6c9fb7518f33290eb369a626a081be047d6b8f616ca0d542810498fe2b267",
+            "SandboxKey": "/var/run/docker/netns/29b6c9fb7518",
+            "Ports": {
+                "8080/tcp": [
+                    {
+                        "HostIp": "0.0.0.0",
+                        "HostPort": "8080"
+                    }
+                ]
+            },
+            "HairpinMode": false,
+            "LinkLocalIPv6Address": "",
+            "LinkLocalIPv6PrefixLen": 0,
+            "SecondaryIPAddresses": null,
+            "SecondaryIPv6Addresses": null,
+            "EndpointID": "f2be177227e3d7af72a4d0e01499a9b809f804f0b37fbb887a9531b29ba77124",
+            "Gateway": "172.17.0.1",
+            "GlobalIPv6Address": "",
+            "GlobalIPv6PrefixLen": 0,
+            "IPAddress": "172.17.0.3",
+            "IPPrefixLen": 16,
+            "IPv6Gateway": "",
+            "MacAddress": "02:42:ac:11:00:03",
+            "Networks": {
+                "bridge": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": null,
+                    "MacAddress": "02:42:ac:11:00:03",
+                    "DriverOpts": null,
+                    "NetworkID": "507a68e45c22faec3bb737720cbab0cc08ff9d22ce4e3386c49ee934268450f2",
+                    "EndpointID": "f2be177227e3d7af72a4d0e01499a9b809f804f0b37fbb887a9531b29ba77124",
+                    "Gateway": "172.17.0.1",
+                    "IPAddress": "172.17.0.3",
+                    "IPPrefixLen": 16,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": null
+                }
+            }
+        }
+    }
+]
