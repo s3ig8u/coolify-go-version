@@ -107,27 +107,27 @@ EOF
 # Try to pull from registry first, fallback to local build
 echo -e "${BLUE}🚀 Deploying Coolify Go...${NC}"
 
-# Check if image exists in registry
-REGISTRY_IMAGE="$REGISTRY:$LATEST_VERSION"
-echo -e "${BLUE}📦 Trying to pull from registry: $REGISTRY_IMAGE${NC}"
+# Try to pull from registry first, fallback to local build if needed
+REGISTRY_IMAGE="$REGISTRY:latest"
+echo -e "${BLUE}📦 Pulling from Azure Container Registry: $REGISTRY_IMAGE${NC}"
 
 if docker pull "$REGISTRY_IMAGE" >/dev/null 2>&1; then
-    echo -e "${GREEN}✅ Successfully pulled from registry${NC}"
+    echo -e "${GREEN}✅ Successfully pulled from Azure registry${NC}"
     USE_REGISTRY_IMAGE="$REGISTRY_IMAGE"
 else
     echo -e "${YELLOW}⚠️  Registry image not available, building from source...${NC}"
     
-    # Clone the repository to build locally
+    # Clone the repository to build locally as fallback
     cd /tmp
     if git clone "$GITHUB_REPO" coolify-go-source >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Source code cloned successfully${NC}"
         cd coolify-go-source/go-src
         
-        # Build the image
+        # Build the image locally
         echo -e "${BLUE}🔨 Building Docker image locally...${NC}"
-        if docker build -t coolify-go:$LATEST_VERSION . >/dev/null 2>&1; then
+        if docker build -t coolify-go:latest . >/dev/null 2>&1; then
             echo -e "${GREEN}✅ Local build successful${NC}"
-            USE_REGISTRY_IMAGE="coolify-go:$LATEST_VERSION"
+            USE_REGISTRY_IMAGE="coolify-go:latest"
         else
             echo -e "${RED}❌ Local build failed${NC}"
             exit 1
