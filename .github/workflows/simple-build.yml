@@ -1,0 +1,28 @@
+name: Simple Build and Push
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'go-src/**' ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: PRD
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Login to Azure Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: shrtso.azurecr.io
+        username: ${{ secrets.AZURE_CLIENT_ID }}
+        password: ${{ secrets.AZURE_CLIENT_SECRET }}
+    
+    - name: Build and push
+      uses: docker/build-push-action@v5
+      with:
+        context: ./go-src
+        push: true
+        tags: shrtso.azurecr.io/coolify-go:latest

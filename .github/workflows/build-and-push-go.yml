@@ -33,6 +33,17 @@ jobs:
       run: |
         echo "Logging in to ${{ env.REGISTRY }}"
         echo "${{ secrets.AZURE_CLIENT_SECRET }}" | docker login ${{ env.REGISTRY }} --username "${{ secrets.AZURE_CLIENT_ID }}" --password-stdin
+        echo "✅ Docker login completed"
+
+    - name: Verify Docker login
+      if: github.event_name != 'pull_request'
+      run: |
+        echo "Verifying Docker registry access..."
+        if docker system info | grep -q "${{ env.REGISTRY }}"; then
+          echo "✅ Logged in to ${{ env.REGISTRY }}"
+        else
+          echo "⚠️  Login status unclear, but proceeding..."
+        fi
 
     - name: Extract metadata
       id: meta
@@ -55,6 +66,8 @@ jobs:
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         platforms: linux/amd64,linux/arm64
+        provenance: false
+        sbom: false
 
     - name: Update installation script version
       if: startsWith(github.ref, 'refs/tags/v')
