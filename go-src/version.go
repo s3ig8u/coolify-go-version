@@ -4,8 +4,8 @@ import "fmt"
 
 const (
 	Version   = "v1.4.0"
-	BuildTime = "2025-06-20T11:22:00Z"
-	GitCommit = "production-ready"
+	BuildTime = "2025-06-20T11:38:00Z"
+	GitCommit = "azure-registry-v1.4.0"
 )
 
 func printVersion() {
