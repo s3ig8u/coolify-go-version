@@ -46,7 +46,7 @@ LATEST_VERSION=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | 
 
 # Use fallback version if API call failed
 if [ -z "$LATEST_VERSION" ]; then
-    LATEST_VERSION="v1.3.0"
+    LATEST_VERSION="v1.4.0"
     echo -e "${YELLOW}⚠️  GitHub API unavailable, using fallback version: $LATEST_VERSION${NC}"
 else
     echo -e "${GREEN}✅ Version: $LATEST_VERSION${NC}"

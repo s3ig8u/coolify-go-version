@@ -3,9 +3,9 @@ package main
 import "fmt"
 
 const (
-	Version   = "v1.3.0"
-	BuildTime = "2025-06-20T10:02:00Z"
-	GitCommit = "abc123"
+	Version   = "v1.4.0"
+	BuildTime = "2025-06-20T11:22:00Z"
+	GitCommit = "production-ready"
 )
 
 func printVersion() {
