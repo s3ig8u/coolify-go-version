@@ -56,21 +56,63 @@ fi
 echo -e "${BLUE}📁 Creating directories...${NC}"
 mkdir -p /data/coolify-go/{source,ssh,applications,databases}
 
-# Install required packages
-echo -e "${BLUE}📦 Installing required packages...${NC}"
-case "$OS_TYPE" in
-    ubuntu|debian)
-        apt-get update -y >/dev/null
-        apt-get install -y docker.io docker-compose curl git >/dev/null
-        systemctl enable docker >/dev/null
-        systemctl start docker >/dev/null
-        ;;
-    centos|fedora|rhel|rocky|almalinux)
-        dnf install -y docker docker-compose curl git >/dev/null
-        systemctl enable docker >/dev/null
-        systemctl start docker >/dev/null
-        ;;
-esac
+# Install Docker if not present
+if ! command -v docker >/dev/null 2>&1; then
+    echo -e "${BLUE}🐳 Installing Docker...${NC}"
+    case "$OS_TYPE" in
+        ubuntu|debian)
+            apt-get update -y >/dev/null 2>&1
+            apt-get install -y curl ca-certificates gnupg lsb-release >/dev/null 2>&1
+            
+            # Add Docker's official GPG key
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg 2>/dev/null
+            
+            # Set up the repository
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list >/dev/null
+            
+            # Install Docker
+            apt-get update -y >/dev/null 2>&1
+            apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null 2>&1
+            ;;
+        centos|fedora|rhel|rocky|almalinux)
+            dnf install -y docker docker-compose >/dev/null 2>&1
+            ;;
+    esac
+    
+    # Start and enable Docker
+    systemctl enable docker >/dev/null 2>&1
+    systemctl start docker >/dev/null 2>&1
+    
+    # Add current user to docker group if not root
+    if [ "$EUID" -ne 0 ]; then
+        usermod -aG docker $USER >/dev/null 2>&1
+    fi
+else
+    echo -e "${GREEN}✅ Docker already installed${NC}"
+fi
+
+# Install docker-compose if not present
+if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then
+    echo -e "${BLUE}📦 Installing docker-compose...${NC}"
+    case "$OS_TYPE" in
+        ubuntu|debian)
+            apt-get install -y docker-compose-plugin >/dev/null 2>&1 || {
+                # Fallback to manual installation
+                curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose >/dev/null 2>&1
+                chmod +x /usr/local/bin/docker-compose >/dev/null 2>&1
+            }
+            ;;
+        centos|fedora|rhel|rocky|almalinux)
+            dnf install -y docker-compose >/dev/null 2>&1 || {
+                # Fallback to manual installation
+                curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose >/dev/null 2>&1
+                chmod +x /usr/local/bin/docker-compose >/dev/null 2>&1
+            }
+            ;;
+    esac
+else
+    echo -e "${GREEN}✅ Docker Compose already installed${NC}"
+fi
 
 # Configure Docker daemon
 echo -e "${BLUE}🔧 Configuring Docker...${NC}"
