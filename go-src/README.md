@@ -2,37 +2,27 @@
 
 A Go-based port of Coolify - an open-source & self-hostable alternative to Heroku / Netlify / Vercel.
 
-> **Note**: This is a community port of Coolify written in Go. For the official Coolify project, visit [coolify.io](https://coolify.io)
+> **Note**: This is a minimal Go port of Coolify. For the official Coolify project, visit [coolify.io](https://coolify.io)
 
 ## 🚀 Quick Start
 
 ### One-Line Installation
 ```bash
-# Install latest version
-curl -fsSL https://raw.githubusercontent.com/s3ig8u/coolify/v4.x/go-src/install.sh | bash
-
-# Or update existing installation
-curl -fsSL https://raw.githubusercontent.com/s3ig8u/coolify/v4.x/go-src/update.sh | bash
+# Install with enhanced script (requires root)
+curl -fsSL https://raw.githubusercontent.com/s3ig8u/coolify-go-version/main/go-src/install.sh | sudo bash
 ```
 
 ### Alternative Installation Methods
 
 #### Docker
 ```bash
-docker run -d --name coolify-go -p 8080:8080 ghcr.io/s3ig8u/coolify-go:latest
+docker run -d --name coolify-go -p 8080:8080 ghcr.io/s3ig8u/coolify-go-version:latest
 ```
 
-#### Binary Download
+#### Docker Compose (Recommended)
 ```bash
-# Linux AMD64
-curl -L -o coolify-go https://github.com/s3ig8u/coolify/releases/latest/download/coolify-go-linux-amd64
-chmod +x coolify-go
-./coolify-go
-
-# macOS ARM64
-curl -L -o coolify-go https://github.com/s3ig8u/coolify/releases/latest/download/coolify-go-darwin-arm64
-chmod +x coolify-go
-./coolify-go
+# Creates full stack with PostgreSQL and Redis
+curl -fsSL https://raw.githubusercontent.com/s3ig8u/coolify-go-version/main/go-src/install.sh | sudo bash
 ```
 
 ## 🛠️ Development with Nix
@@ -101,31 +91,46 @@ make status
 
 ## Development
 
-### Live Reload
+### Quick Development
 ```bash
-# Install air for live reload
-go install github.com/cosmtrek/air@latest
+# Install dependencies
+make deps
 
-# Run with live reload
-air
+# Run in development mode
+make dev
+
+# Build the application
+make build
+
+# Run the built binary
+make run
+
+# View all available commands
+make help
 ```
 
 ### Database Operations
 ```bash
-# Connect to PostgreSQL
-psql "postgres://coolify:password@localhost:5432/coolify"
+# Connect to PostgreSQL (when running via install script)
+psql "postgres://coolify_go:$(grep DB_PASSWORD /data/coolify-go/.env | cut -d= -f2)@localhost:5432/coolify_go"
 
 # Connect to Redis
-redis-cli -p 6379
+redis-cli -p 6379 -a $(grep REDIS_PASSWORD /data/coolify-go/.env | cut -d= -f2)
 ```
 
-### Testing
+### Docker Development
 ```bash
-# Run tests
-go test ./...
+# Build Docker image
+make docker
 
-# Run tests with coverage
-go test -cover ./...
+# Start with Docker Compose
+make compose-up
+
+# View logs
+make logs
+
+# Stop services
+make compose-down
 ```
 
 ## Project Structure

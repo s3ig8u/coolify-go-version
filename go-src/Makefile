@@ -1,82 +1,88 @@
-# Coolify Go Development Makefile
+.PHONY: build run dev docker clean test test-install version quick-test help
 
-.PHONY: shell dev start stop clean test build release deploy update version
+# Variables
+BINARY_NAME=coolify-go
+DOCKER_IMAGE=coolify-go
+VERSION?=v1.3.0
 
-# Enter Nix development shell
-shell:
-	./shell.sh
+# Build the application
+build:
+	go build -o $(BINARY_NAME) .
 
-# Start development environment (databases + shell)
+# Run the application
+run: build
+	./$(BINARY_NAME)
+
+# Development with live reload
 dev:
-	./shell.sh -c "docker-compose up -d && exec bash"
+	go run .
 
-# Start the Go server (inside Nix)
-start:
-	./shell.sh -c "go run main.go"
+# Build Docker image
+docker:
+	docker build -t $(DOCKER_IMAGE):$(VERSION) .
+	docker build -t $(DOCKER_IMAGE):latest .
 
-# Start with live reload (inside Nix)
-live:
-	./shell.sh -c "air"
+# Run with Docker Compose
+compose-up:
+	docker-compose up -d
 
-# Stop all services
-stop:
+# Stop Docker Compose
+compose-down:
 	docker-compose down
 
-# Clean up containers and volumes
+# View logs
+logs:
+	docker-compose logs -f coolify-go
+
+# Clean build artifacts
 clean:
-	docker-compose down -v
-	docker system prune -f
+	rm -f $(BINARY_NAME)
+	docker image prune -f
 
-# Run tests (inside Nix)
+# Test the application
 test:
-	./shell.sh -c "go test ./..."
+	go test ./...
 
-# Build binary (inside Nix)
-build:
-	./shell.sh -c "go build -o coolify-go ."
+# Format code
+fmt:
+	go fmt ./...
 
-# Quick development cycle
-quick:
-	docker-compose up -d
-	./shell.sh -c "go run main.go"
+# Lint code
+lint:
+	golangci-lint run
 
-# Build release (cross-platform binaries + Docker)
-release:
-	./shell.sh -c "./scripts/build.sh"
+# Install dependencies
+deps:
+	go mod tidy
+	go mod download
 
-# Deploy to environment (usage: make deploy ENV=staging VERSION=v1.0.1)
-deploy:
-	./scripts/deploy.sh $(ENV) $(VERSION)
+# Test installation process
+test-install:
+	chmod +x test-install.sh
+	./test-install.sh
 
-# Update running application with zero downtime
-update:
-	@echo "🔄 Updating application..."
-	./scripts/build.sh
-	./scripts/deploy.sh staging latest
-
-# Show version information
+# Version information
 version:
-	./shell.sh -c "go run . -version"
+	@echo "$(VERSION)"
 
-# Show current running version
-status:
-	@echo "📊 Application Status:"
-	@curl -s http://localhost:8080/health | jq . || echo "Service not running"
+# Quick test (build + version check)
+quick-test: build
+	./$(BINARY_NAME) -version
 
 # Show help
 help:
-	@echo "Coolify Go Development Commands:"
-	@echo "  make shell     - Enter Nix development shell"
-	@echo "  make dev       - Start databases and enter shell"
-	@echo "  make start     - Run Go server"
-	@echo "  make live      - Run with live reload (air)"
-	@echo "  make stop      - Stop all services"
-	@echo "  make clean     - Clean containers and volumes"
-	@echo "  make test      - Run tests"
-	@echo "  make build     - Build binary"
-	@echo "  make quick     - Quick start (databases + server)"
-	@echo "  make release   - Build release (binaries + Docker)"
-	@echo "  make deploy    - Deploy to environment"
-	@echo "  make update    - Update running application"
-	@echo "  make version   - Show version information"
-	@echo "  make status    - Show current running version"
+	@echo "Available commands:"
+	@echo "  build        - Build the binary"
+	@echo "  run          - Build and run the application"
+	@echo "  dev          - Run in development mode"
+	@echo "  docker       - Build Docker image"
+	@echo "  compose-up   - Start with Docker Compose"
+	@echo "  compose-down - Stop Docker Compose"
+	@echo "  logs         - View application logs"
+	@echo "  clean        - Clean build artifacts"
+	@echo "  test         - Run tests"
+	@echo "  test-install - Test installation process"
+	@echo "  fmt          - Format code"
+	@echo "  deps         - Install dependencies"
+	@echo "  version      - Show version"
+	@echo "  quick-test   - Quick build and version test"
