@@ -19,13 +19,15 @@ curl -fsSL https://raw.githubusercontent.com/s3ig8u/coolify-go-version/main/go-s
 
 ### What This Does:
 1. ✅ Detects your OS and architecture
-2. ✅ Installs Docker if not present
+2. ✅ Installs Docker and required packages
 3. ✅ Configures Docker daemon properly
 4. ✅ Creates `/data/coolify-go/` directory structure
 5. ✅ Generates secure random passwords
-6. ✅ Deploys full stack: App + PostgreSQL + Redis
-7. ✅ Sets up health monitoring
-8. ✅ Starts all services automatically
+6. ✅ **Tries to pull from registry first**
+7. ✅ **Falls back to building from source if needed**
+8. ✅ Deploys full stack: App + PostgreSQL + Redis
+9. ✅ Sets up health monitoring and dependency management
+10. ✅ Provides external IP access information
 
 ### After Installation:
 ```bash
@@ -72,7 +74,7 @@ docker run -d \
   --name coolify-go \
   --restart unless-stopped \
   -p 8080:8080 \
-  ghcr.io/s3ig8u/coolify-go-version:v1.3.0
+  shrtso.azurecr.io/coolify-go:v1.3.0
 ```
 
 ### With Full Stack (Docker Compose)
@@ -82,7 +84,7 @@ cat > docker-compose.yml << 'EOF'
 version: '3.8'
 services:
   coolify-go:
-    image: ghcr.io/s3ig8u/coolify-go-version:v1.3.0
+    image: shrtso.azurecr.io/coolify-go:v1.3.0
     container_name: coolify-go
     restart: unless-stopped
     ports:
