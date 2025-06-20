@@ -16,7 +16,7 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    environment: PRD
+    environment: ${{ github.event_name != 'pull_request' && 'PRD' || '' }}
 
     steps:
     - name: Checkout code
