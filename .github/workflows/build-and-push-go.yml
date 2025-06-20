@@ -28,22 +28,13 @@ jobs:
         driver-opts: |
           image=moby/buildkit:v0.12.0
 
-    - name: Log in to Azure Container Registry
+    - name: Login to Azure Container Registry
       if: github.event_name != 'pull_request'
-      run: |
-        echo "Logging in to ${{ env.REGISTRY }}"
-        echo "${{ secrets.AZURE_CLIENT_SECRET }}" | docker login ${{ env.REGISTRY }} --username "${{ secrets.AZURE_CLIENT_ID }}" --password-stdin
-        echo "✅ Docker login completed"
-
-    - name: Verify Docker login
-      if: github.event_name != 'pull_request'
-      run: |
-        echo "Verifying Docker registry access..."
-        if docker system info | grep -q "${{ env.REGISTRY }}"; then
-          echo "✅ Logged in to ${{ env.REGISTRY }}"
-        else
-          echo "⚠️  Login status unclear, but proceeding..."
-        fi
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.AZURE_CLIENT_ID }}
+        password: ${{ secrets.AZURE_CLIENT_SECRET }}
 
     - name: Extract metadata
       id: meta
@@ -85,7 +76,7 @@ jobs:
     - name: Test Docker image (if pushed)
       if: github.event_name != 'pull_request'
       run: |
-        docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest -version
+        docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest --version
 
     - name: Create deployment summary
       if: github.event_name != 'pull_request'
