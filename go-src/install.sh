@@ -118,6 +118,12 @@ sleep 3
 
 # Create environment file
 echo -e "${BLUE}⚙️  Creating configuration...${NC}"
+
+# Generate safe passwords (alphanumeric only to avoid special characters)
+DB_PASS=$(openssl rand -hex 16 2>/dev/null || echo "secure_db_password_123")
+REDIS_PASS=$(openssl rand -hex 16 2>/dev/null || echo "secure_redis_password_123")
+JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || echo "secure_jwt_secret_here_replace_in_production")
+
 cat > /data/coolify-go/.env << EOF
 APP_NAME=Coolify-Go
 APP_ENV=production
@@ -126,11 +132,11 @@ DB_HOST=postgres
 DB_PORT=5432
 DB_NAME=coolify_go
 DB_USER=coolify_go
-DB_PASSWORD=$(openssl rand -base64 32 2>/dev/null || echo "secure_db_password_123")
+DB_PASSWORD=${DB_PASS}
 REDIS_HOST=redis
 REDIS_PORT=6379
-REDIS_PASSWORD=$(openssl rand -base64 32 2>/dev/null || echo "secure_redis_password_123")
-JWT_SECRET=$(openssl rand -base64 64 2>/dev/null || echo "secure_jwt_secret_here_replace_in_production")
+REDIS_PASSWORD=${REDIS_PASS}
+JWT_SECRET=${JWT_SECRET}
 EOF
 
 # Try to pull from registry first, fallback to local build
