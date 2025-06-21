@@ -185,3 +185,4 @@ Copy `.env.example` to `.env` and configure:
 
 MIT License - see LICENSE file for details
 # Test comment
+# Another test
