@@ -41,21 +41,71 @@ func ConnectDatabase(dbConfig DatabaseConfig) error {
 	return nil
 }
 
-// AutoMigrate runs database migrations
+// AutoMigrate runs database migrations with hash validation
 func AutoMigrate() error {
 	log.Println("Running database migrations...")
 
+	// Run GORM auto-migration
 	err := DB.AutoMigrate(
 		&models.User{},
 		&models.Team{},
 		&models.Server{},
 		&models.Application{},
+		&models.SchemaHash{},
 	)
 
 	if err != nil {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
+	// Validate schema hash
+	isValid, expectedHash, err := models.ValidateSchemaHash(DB)
+	if err != nil {
+		return fmt.Errorf("failed to validate schema hash: %w", err)
+	}
+
+	if !isValid {
+		log.Printf("Schema hash mismatch detected. Expected: %s", expectedHash)
+
+		// Save new schema hash
+		modelNames := []string{"User", "Team", "Server", "Application", "SchemaHash"}
+		err = models.SaveSchemaHash(DB, expectedHash, "v1.0.0", modelNames)
+		if err != nil {
+			return fmt.Errorf("failed to save schema hash: %w", err)
+		}
+
+		log.Printf("New schema hash saved: %s", expectedHash)
+	} else {
+		log.Println("Schema hash validation passed - no changes needed")
+	}
+
 	log.Println("Database migrations completed successfully")
 	return nil
+}
+
+// GetSchemaInfo returns current schema information
+func GetSchemaInfo() (map[string]interface{}, error) {
+	currentHash, err := models.GetCurrentSchemaHash(DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current schema hash: %w", err)
+	}
+
+	expectedHash, err := models.GenerateSchemaHash()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate expected hash: %w", err)
+	}
+
+	info := map[string]interface{}{
+		"expected_hash": expectedHash,
+		"is_valid":      false,
+	}
+
+	if currentHash != nil {
+		info["current_hash"] = currentHash.Hash
+		info["current_version"] = currentHash.Version
+		info["applied_at"] = currentHash.AppliedAt
+		info["is_valid"] = currentHash.Hash == expectedHash
+	}
+
+	return info, nil
 }

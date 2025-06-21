@@ -1,34 +1,59 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  postgres:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: coolify
-      POSTGRES_USER: coolify
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U coolify"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+    coolify-go:
+        build: .
+        container_name: coolify-go-local
+        ports:
+            - "8081:8080"
+        environment:
+            - DB_HOST=postgres
+            - DB_PORT=5432
+            - DB_NAME=coolify
+            - DB_USER=coolify
+            - DB_PASSWORD=password
+            - REDIS_HOST=redis
+            - REDIS_PORT=6379
+        depends_on:
+            - postgres
+            - redis
+        volumes:
+            - .:/app
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
+    postgres:
+        image: postgres:15
+        environment:
+            POSTGRES_DB: coolify
+            POSTGRES_USER: coolify
+            POSTGRES_PASSWORD: password
+        ports:
+            - "5432:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U coolify"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+
+    redis:
+        image: redis:7-alpine
+        ports:
+            - "6379:6379"
+        volumes:
+            - redis_data:/data
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 5s
+            timeout: 3s
+            retries: 5
 
 volumes:
-  postgres_data:
-  redis_data:
+    postgres_data:
+    redis_data:
