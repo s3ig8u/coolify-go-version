@@ -1,8 +1,8 @@
 module coolify-go
 
-go 1.23
+go 1.24
 
-toolchain go1.23.10
+toolchain go1.24.0
 
 require (
 	github.com/gin-gonic/gin v1.10.1
