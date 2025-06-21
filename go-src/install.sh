@@ -249,16 +249,25 @@ echo ""
 echo -e "${BLUE}📊 Service Status:${NC}"
 curl -s http://localhost:8080/health 2>/dev/null | python3 -m json.tool 2>/dev/null || curl -s http://localhost:8080/health
 
-# Get external IP
-EXTERNAL_IP=$(curl -s https://ifconfig.me 2>/dev/null || curl -s https://ipinfo.io/ip 2>/dev/null || echo "your-vps-ip")
+# Get external IP (IPv4 only)
+EXTERNAL_IP=$(curl -4 -s https://ifconfig.me 2>/dev/null || curl -4 -s https://ipinfo.io/ip 2>/dev/null || curl -s https://api.ipify.org 2>/dev/null || echo "your-vps-ip")
+
+# Handle IPv6 addresses by wrapping in brackets
+if [[ $EXTERNAL_IP == *":"* ]] && [[ $EXTERNAL_IP != "your-vps-ip" ]]; then
+    EXTERNAL_URL="http://[$EXTERNAL_IP]:8080"
+    HEALTH_URL="http://[$EXTERNAL_IP]:8080/health"
+else
+    EXTERNAL_URL="http://$EXTERNAL_IP:8080"
+    HEALTH_URL="http://$EXTERNAL_IP:8080/health"
+fi
 
 echo ""
 echo -e "${GREEN}🎉 Installation completed successfully!${NC}"
 echo -e "${BLUE}🌐 Access your application at:${NC}"
 echo -e "   Local:    http://localhost:8080"
-echo -e "   External: http://$EXTERNAL_IP:8080"
+echo -e "   External: $EXTERNAL_URL"
 echo ""
-echo -e "${BLUE}📊 Health check: http://$EXTERNAL_IP:8080/health${NC}"
+echo -e "${BLUE}📊 Health check: $HEALTH_URL${NC}"
 echo -e "${BLUE}📁 Data directory: /data/coolify-go${NC}"
 echo -e "${BLUE}⚙️  Configuration: /data/coolify-go/.env${NC}"
 echo ""
