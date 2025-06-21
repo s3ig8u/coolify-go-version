@@ -1,26 +1,14 @@
 package main
 
 import (
-	"database/sql"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
-	_ "github.com/lib/pq"
+	"coolify-go/internal/config"
 )
-
-type Config struct {
-	Port   string
-	DBHost string
-	DBPort string
-	DBName string
-	DBUser string
-	DBPass string
-}
 
 type HealthResponse struct {
 	Status    string    `json:"status"`
@@ -31,48 +19,17 @@ type HealthResponse struct {
 	Database  string    `json:"database"`
 }
 
-var db *sql.DB
-var config Config
-
-func loadConfig() Config {
-	return Config{
-		Port:   getEnv("APP_PORT", "8080"),
-		DBHost: getEnv("DB_HOST", "postgres"),
-		DBPort: getEnv("DB_PORT", "5432"),
-		DBName: getEnv("DB_NAME", "coolify_go"),
-		DBUser: getEnv("DB_USER", "coolify_go"),
-		DBPass: getEnv("DB_PASSWORD", "changeme"),
-	}
-}
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-func initDatabase() error {
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		config.DBHost, config.DBPort, config.DBUser, config.DBPass, config.DBName)
-
-	var err error
-	db, err = sql.Open("postgres", dsn)
-	if err != nil {
-		return err
-	}
-
-	return db.Ping()
-}
+var appConfig *config.Config
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	dbStatus := "connected"
-	if db == nil {
-		dbStatus = "not_initialized"
-	} else if err := db.Ping(); err != nil {
-		dbStatus = "disconnected"
+	dbStatus := "disconnected"
+	if config.DB != nil {
+		sqlDB, err := config.DB.DB()
+		if err == nil && sqlDB.Ping() == nil {
+			dbStatus = "connected"
+		}
 	}
 
 	response := HealthResponse{
@@ -84,7 +41,17 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 		Database:  dbStatus,
 	}
 
-	json.NewEncoder(w).Encode(response)
+	// Use a simple JSON encoder for now
+	jsonResponse := fmt.Sprintf(`{
+		"status": "%s",
+		"version": "%s",
+		"buildTime": "%s",
+		"commit": "%s",
+		"timestamp": "%s",
+		"database": "%s"
+	}`, response.Status, response.Version, response.BuildTime, response.Commit, response.Timestamp.Format(time.RFC3339), response.Database)
+
+	w.Write([]byte(jsonResponse))
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
@@ -124,7 +91,8 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
         <ul>
             <li>✅ Basic HTTP server</li>
             <li>✅ Health checks</li>
-            <li>✅ Database connectivity</li>
+            <li>✅ Database connectivity (GORM)</li>
+            <li>✅ Database models (User, Team, Server, Application)</li>
             <li>⏳ User authentication (coming soon)</li>
             <li>⏳ Application deployment (coming soon)</li>
             <li>⏳ Server management (coming soon)</li>
@@ -156,12 +124,12 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 
 func versionHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	response := map[string]string{
-		"version":   Version,
-		"buildTime": BuildTime,
-		"commit":    GitCommit,
-	}
-	json.NewEncoder(w).Encode(response)
+	response := fmt.Sprintf(`{
+		"version": "%s",
+		"buildTime": "%s",
+		"commit": "%s"
+	}`, Version, BuildTime, GitCommit)
+	w.Write([]byte(response))
 }
 
 func main() {
@@ -173,14 +141,22 @@ func main() {
 		return
 	}
 
-	config = loadConfig()
+	// Load configuration
+	var err error
+	appConfig, err = config.Load()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
 
-	// Try to connect to database
-	if err := initDatabase(); err != nil {
+	// Connect to database
+	if err := config.ConnectDatabase(appConfig.Database); err != nil {
 		log.Printf("Database connection failed: %v", err)
 		log.Printf("Continuing without database...")
 	} else {
-		log.Printf("Database connected successfully")
+		// Run database migrations
+		if err := config.AutoMigrate(); err != nil {
+			log.Printf("Database migration failed: %v", err)
+		}
 	}
 
 	// Setup routes
@@ -188,7 +164,7 @@ func main() {
 	http.HandleFunc("/health", healthHandler)
 	http.HandleFunc("/version", versionHandler)
 
-	port := ":" + config.Port
+	port := ":" + appConfig.Server.Port
 	fmt.Printf("🚀 Coolify Go v%s server running at http://localhost%s\n", Version, port)
 	fmt.Printf("📊 Health check: http://localhost%s/health\n", port)
 
