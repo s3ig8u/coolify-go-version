@@ -3,472 +3,654 @@ description:
 globs: 
 alwaysApply: false
 ---
-# Coolify API & Routing Architecture
+# Coolify Go API & Routing Architecture
 
 ## Routing Structure
 
-Coolify implements **multi-layered routing** with web interfaces, RESTful APIs, webhook endpoints, and real-time communication channels.
+Coolify Go implements **multi-layered routing** with web interfaces, RESTful APIs, webhook endpoints, and real-time communication channels using Go HTTP frameworks.
 
-## Route Files
+## Route Organization
 
 ### Core Route Definitions
-- **[routes/web.php](mdc:routes/web.php)** - Web application routes (21KB, 362 lines)
-- **[routes/api.php](mdc:routes/api.php)** - RESTful API endpoints (13KB, 185 lines)
-- **[routes/webhooks.php](mdc:routes/webhooks.php)** - Webhook receivers (815B, 22 lines)
-- **[routes/channels.php](mdc:routes/channels.php)** - WebSocket channel definitions (829B, 33 lines)
-- **[routes/console.php](mdc:routes/console.php)** - Artisan command routes (592B, 20 lines)
+- **[routes/web.go](mdc:internal/routes/web.go)** - Web application routes
+- **[routes/api.go](mdc:internal/routes/api.go)** - RESTful API endpoints
+- **[routes/webhooks.go](mdc:internal/routes/webhooks.go)** - Webhook receivers
+- **[routes/websocket.go](mdc:internal/routes/websocket.go)** - WebSocket handlers
+- **[routes/middleware.go](mdc:internal/middleware/middleware.go)** - HTTP middleware
 
 ## Web Application Routing
 
 ### Authentication Routes
-```php
-// Laravel Fortify authentication
-Route::middleware('guest')->group(function () {
-    Route::get('/login', [AuthController::class, 'login']);
-    Route::get('/register', [AuthController::class, 'register']);
-    Route::get('/forgot-password', [AuthController::class, 'forgotPassword']);
-});
+```go
+// Gin router setup
+func SetupAuthRoutes(r *gin.Engine, authService *AuthService) {
+    auth := r.Group("/auth")
+    {
+        auth.GET("/login", handlers.LoginPage)
+        auth.POST("/login", handlers.Login(authService))
+        auth.GET("/register", handlers.RegisterPage)
+        auth.POST("/register", handlers.Register(authService))
+        auth.GET("/forgot-password", handlers.ForgotPasswordPage)
+        auth.POST("/forgot-password", handlers.ForgotPassword(authService))
+        auth.GET("/logout", handlers.Logout(authService))
+    }
+}
 ```
 
 ### Dashboard & Core Features
-```php
-// Main application routes
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/dashboard', Dashboard::class)->name('dashboard');
-    Route::get('/projects', ProjectIndex::class)->name('projects');
-    Route::get('/servers', ServerIndex::class)->name('servers');
-    Route::get('/teams', TeamIndex::class)->name('teams');
-});
+```go
+// Protected routes with authentication middleware
+func SetupProtectedRoutes(r *gin.Engine, authMiddleware gin.HandlerFunc) {
+    protected := r.Group("/")
+    protected.Use(authMiddleware)
+    {
+        protected.GET("/dashboard", handlers.Dashboard)
+        protected.GET("/projects", handlers.ProjectIndex)
+        protected.GET("/servers", handlers.ServerIndex)
+        protected.GET("/teams", handlers.TeamIndex)
+    }
+}
 ```
 
 ### Resource Management Routes
-```php
-// Server management
-Route::prefix('servers')->group(function () {
-    Route::get('/{server}', ServerShow::class)->name('server.show');
-    Route::get('/{server}/edit', ServerEdit::class)->name('server.edit');
-    Route::get('/{server}/logs', ServerLogs::class)->name('server.logs');
-});
+```go
+// Server management routes
+func SetupServerRoutes(r *gin.Engine, authMiddleware gin.HandlerFunc) {
+    servers := r.Group("/servers")
+    servers.Use(authMiddleware)
+    {
+        servers.GET("/:id", handlers.ServerShow)
+        servers.GET("/:id/edit", handlers.ServerEdit)
+        servers.PUT("/:id", handlers.ServerUpdate)
+        servers.DELETE("/:id", handlers.ServerDelete)
+        servers.GET("/:id/logs", handlers.ServerLogs)
+        servers.POST("/:id/test-connection", handlers.ServerTestConnection)
+    }
+}
 
-// Application management
-Route::prefix('applications')->group(function () {
-    Route::get('/{application}', ApplicationShow::class)->name('application.show');
-    Route::get('/{application}/deployments', ApplicationDeployments::class);
-    Route::get('/{application}/environment-variables', ApplicationEnvironmentVariables::class);
-    Route::get('/{application}/logs', ApplicationLogs::class);
-});
+// Application management routes
+func SetupApplicationRoutes(r *gin.Engine, authMiddleware gin.HandlerFunc) {
+    apps := r.Group("/applications")
+    apps.Use(authMiddleware)
+    {
+        apps.GET("/:id", handlers.ApplicationShow)
+        apps.GET("/:id/deployments", handlers.ApplicationDeployments)
+        apps.GET("/:id/environment-variables", handlers.ApplicationEnvironmentVariables)
+        apps.PUT("/:id/environment-variables", handlers.ApplicationUpdateEnvironmentVariables)
+        apps.GET("/:id/logs", handlers.ApplicationLogs)
+        apps.POST("/:id/deploy", handlers.ApplicationDeploy)
+        apps.POST("/:id/restart", handlers.ApplicationRestart)
+        apps.POST("/:id/stop", handlers.ApplicationStop)
+    }
+}
 ```
 
 ## RESTful API Architecture
 
 ### API Versioning
-```php
-// API route structure
-Route::prefix('v1')->group(function () {
-    // Application endpoints
-    Route::apiResource('applications', ApplicationController::class);
-    Route::apiResource('servers', ServerController::class);
-    Route::apiResource('teams', TeamController::class);
-});
+```go
+// API route structure with versioning
+func SetupAPIRoutes(r *gin.Engine, authMiddleware gin.HandlerFunc) {
+    v1 := r.Group("/api/v1")
+    v1.Use(authMiddleware)
+    {
+        // Application endpoints
+        v1.GET("/applications", handlers.APIApplicationIndex)
+        v1.POST("/applications", handlers.APIApplicationCreate)
+        v1.GET("/applications/:id", handlers.APIApplicationShow)
+        v1.PUT("/applications/:id", handlers.APIApplicationUpdate)
+        v1.DELETE("/applications/:id", handlers.APIApplicationDelete)
+        
+        // Server endpoints
+        v1.GET("/servers", handlers.APIServerIndex)
+        v1.POST("/servers", handlers.APIServerCreate)
+        v1.GET("/servers/:id", handlers.APIServerShow)
+        v1.PUT("/servers/:id", handlers.APIServerUpdate)
+        v1.DELETE("/servers/:id", handlers.APIServerDelete)
+        
+        // Team endpoints
+        v1.GET("/teams", handlers.APITeamIndex)
+        v1.POST("/teams", handlers.APITeamCreate)
+        v1.GET("/teams/:id", handlers.APITeamShow)
+        v1.PUT("/teams/:id", handlers.APITeamUpdate)
+        v1.DELETE("/teams/:id", handlers.APITeamDelete)
+    }
+}
 ```
 
 ### Authentication & Authorization
-```php
-// Sanctum API authentication
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/user', function (Request $request) {
-        return $request->user();
-    });
-    
-    // Team-scoped resources
-    Route::middleware('team.access')->group(function () {
-        Route::apiResource('applications', ApplicationController::class);
-    });
-});
+```go
+// JWT authentication middleware
+func JWTAuthMiddleware(authService *AuthService) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        token := c.GetHeader("Authorization")
+        if token == "" {
+            c.JSON(401, gin.H{"error": "Authorization header required"})
+            c.Abort()
+            return
+        }
+        
+        // Remove "Bearer " prefix
+        if strings.HasPrefix(token, "Bearer ") {
+            token = token[7:]
+        }
+        
+        user, err := authService.ValidateToken(token)
+        if err != nil {
+            c.JSON(401, gin.H{"error": "Invalid token"})
+            c.Abort()
+            return
+        }
+        
+        c.Set("user", user)
+        c.Next()
+    }
+}
+
+// Team access middleware
+func TeamAccessMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        user := c.MustGet("user").(*User)
+        teamID := c.Param("teamId")
+        
+        if !user.HasTeamAccess(teamID) {
+            c.JSON(403, gin.H{"error": "Access denied to team resources"})
+            c.Abort()
+            return
+        }
+        
+        c.Set("teamId", teamID)
+        c.Next()
+    }
+}
 ```
 
 ### Application Management API
-```php
-// Application CRUD operations
-Route::prefix('applications')->group(function () {
-    Route::get('/', [ApplicationController::class, 'index']);
-    Route::post('/', [ApplicationController::class, 'store']);
-    Route::get('/{application}', [ApplicationController::class, 'show']);
-    Route::patch('/{application}', [ApplicationController::class, 'update']);
-    Route::delete('/{application}', [ApplicationController::class, 'destroy']);
+```go
+// Application CRUD handlers
+func APIApplicationIndex(c *gin.Context) {
+    user := c.MustGet("user").(*User)
+    teamID := c.Query("team_id")
     
-    // Deployment operations
-    Route::post('/{application}/deploy', [ApplicationController::class, 'deploy']);
-    Route::post('/{application}/restart', [ApplicationController::class, 'restart']);
-    Route::post('/{application}/stop', [ApplicationController::class, 'stop']);
-    Route::get('/{application}/logs', [ApplicationController::class, 'logs']);
-});
+    applications, err := applicationService.GetByTeam(c.Request.Context(), teamID)
+    if err != nil {
+        c.JSON(500, gin.H{"error": err.Error()})
+        return
+    }
+    
+    c.JSON(200, gin.H{
+        "data": applications,
+        "meta": gin.H{
+            "total": len(applications),
+        },
+    })
+}
+
+func APIApplicationCreate(c *gin.Context) {
+    user := c.MustGet("user").(*User)
+    
+    var req CreateApplicationRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(400, gin.H{"error": "Invalid request data"})
+        return
+    }
+    
+    // Validate request
+    if err := req.Validate(); err != nil {
+        c.JSON(400, gin.H{"error": err.Error()})
+        return
+    }
+    
+    application, err := applicationService.Create(c.Request.Context(), &req, user.ID)
+    if err != nil {
+        c.JSON(500, gin.H{"error": err.Error()})
+        return
+    }
+    
+    c.JSON(201, gin.H{"data": application})
+}
+
+func APIApplicationShow(c *gin.Context) {
+    user := c.MustGet("user").(*User)
+    appID := c.Param("id")
+    
+    application, err := applicationService.GetByID(c.Request.Context(), appID)
+    if err != nil {
+        c.JSON(404, gin.H{"error": "Application not found"})
+        return
+    }
+    
+    // Check access permissions
+    if !user.HasApplicationAccess(application.ID) {
+        c.JSON(403, gin.H{"error": "Access denied"})
+        return
+    }
+    
+    c.JSON(200, gin.H{"data": application})
+}
 ```
 
 ### Server Management API
-```php
+```go
 // Server operations
-Route::prefix('servers')->group(function () {
-    Route::get('/', [ServerController::class, 'index']);
-    Route::post('/', [ServerController::class, 'store']);
-    Route::get('/{server}', [ServerController::class, 'show']);
-    Route::patch('/{server}', [ServerController::class, 'update']);
-    Route::delete('/{server}', [ServerController::class, 'destroy']);
+func APIServerIndex(c *gin.Context) {
+    user := c.MustGet("user").(*User)
+    teamID := c.Query("team_id")
     
-    // Server actions
-    Route::post('/{server}/validate', [ServerController::class, 'validate']);
-    Route::get('/{server}/usage', [ServerController::class, 'usage']);
-    Route::post('/{server}/cleanup', [ServerController::class, 'cleanup']);
-});
+    servers, err := serverService.GetByTeam(c.Request.Context(), teamID)
+    if err != nil {
+        c.JSON(500, gin.H{"error": err.Error()})
+        return
+    }
+    
+    c.JSON(200, gin.H{
+        "data": servers,
+        "meta": gin.H{
+            "total": len(servers),
+        },
+    })
+}
+
+func APIServerCreate(c *gin.Context) {
+    user := c.MustGet("user").(*User)
+    
+    var req CreateServerRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(400, gin.H{"error": "Invalid request data"})
+        return
+    }
+    
+    server, err := serverService.Create(c.Request.Context(), &req, user.ID)
+    if err != nil {
+        c.JSON(500, gin.H{"error": err.Error()})
+        return
+    }
+    
+    c.JSON(201, gin.H{"data": server})
+}
+
+func APIServerTestConnection(c *gin.Context) {
+    serverID := c.Param("id")
+    
+    result, err := serverService.TestConnection(c.Request.Context(), serverID)
+    if err != nil {
+        c.JSON(500, gin.H{"error": err.Error()})
+        return
+    }
+    
+    c.JSON(200, gin.H{"data": result})
+}
 ```
 
 ### Database Management API
-```php
+```go
 // Database operations
-Route::prefix('databases')->group(function () {
-    Route::get('/', [DatabaseController::class, 'index']);
-    Route::post('/', [DatabaseController::class, 'store']);
-    Route::get('/{database}', [DatabaseController::class, 'show']);
-    Route::patch('/{database}', [DatabaseController::class, 'update']);
-    Route::delete('/{database}', [DatabaseController::class, 'destroy']);
+func APIDatabaseIndex(c *gin.Context) {
+    user := c.MustGet("user").(*User)
+    teamID := c.Query("team_id")
     
-    // Database actions
-    Route::post('/{database}/backup', [DatabaseController::class, 'backup']);
-    Route::post('/{database}/restore', [DatabaseController::class, 'restore']);
-    Route::get('/{database}/logs', [DatabaseController::class, 'logs']);
-});
+    databases, err := databaseService.GetByTeam(c.Request.Context(), teamID)
+    if err != nil {
+        c.JSON(500, gin.H{"error": err.Error()})
+        return
+    }
+    
+    c.JSON(200, gin.H{
+        "data": databases,
+        "meta": gin.H{
+            "total": len(databases),
+        },
+    })
+}
+
+func APIDatabaseBackup(c *gin.Context) {
+    databaseID := c.Param("id")
+    
+    backup, err := databaseService.CreateBackup(c.Request.Context(), databaseID)
+    if err != nil {
+        c.JSON(500, gin.H{"error": err.Error()})
+        return
+    }
+    
+    c.JSON(200, gin.H{"data": backup})
+}
 ```
 
 ## Webhook Architecture
 
 ### Git Integration Webhooks
-```php
-// GitHub webhook endpoints
-Route::post('/webhooks/github/{application}', [GitHubWebhookController::class, 'handle'])
-    ->name('webhooks.github');
+```go
+// GitHub webhook handler
+func GitHubWebhookHandler(c *gin.Context) {
+    applicationID := c.Param("applicationId")
+    
+    // Verify webhook signature
+    signature := c.GetHeader("X-Hub-Signature-256")
+    if !verifyGitHubSignature(c.Request.Body, signature) {
+        c.JSON(401, gin.H{"error": "Invalid signature"})
+        return
+    }
+    
+    var payload GitHubWebhookPayload
+    if err := c.ShouldBindJSON(&payload); err != nil {
+        c.JSON(400, gin.H{"error": "Invalid payload"})
+        return
+    }
+    
+    // Process webhook
+    err := deploymentService.ProcessGitWebhook(c.Request.Context(), applicationID, &payload)
+    if err != nil {
+        c.JSON(500, gin.H{"error": err.Error()})
+        return
+    }
+    
+    c.JSON(200, gin.H{"status": "processed"})
+}
 
-// GitLab webhook endpoints
-Route::post('/webhooks/gitlab/{application}', [GitLabWebhookController::class, 'handle'])
-    ->name('webhooks.gitlab');
-
-// Generic Git webhooks
-Route::post('/webhooks/git/{application}', [GitWebhookController::class, 'handle'])
-    ->name('webhooks.git');
+// GitLab webhook handler
+func GitLabWebhookHandler(c *gin.Context) {
+    applicationID := c.Param("applicationId")
+    
+    // Verify webhook token
+    token := c.GetHeader("X-Gitlab-Token")
+    if !verifyGitLabToken(token) {
+        c.JSON(401, gin.H{"error": "Invalid token"})
+        return
+    }
+    
+    var payload GitLabWebhookPayload
+    if err := c.ShouldBindJSON(&payload); err != nil {
+        c.JSON(400, gin.H{"error": "Invalid payload"})
+        return
+    }
+    
+    err := deploymentService.ProcessGitWebhook(c.Request.Context(), applicationID, &payload)
+    if err != nil {
+        c.JSON(500, gin.H{"error": err.Error()})
+        return
+    }
+    
+    c.JSON(200, gin.H{"status": "processed"})
+}
 ```
 
 ### Deployment Webhooks
-```php
+```go
 // Deployment status webhooks
-Route::post('/webhooks/deployment/{deployment}/success', [DeploymentWebhookController::class, 'success']);
-Route::post('/webhooks/deployment/{deployment}/failure', [DeploymentWebhookController::class, 'failure']);
-Route::post('/webhooks/deployment/{deployment}/progress', [DeploymentWebhookController::class, 'progress']);
+func DeploymentWebhookHandler(c *gin.Context) {
+    deploymentID := c.Param("deploymentId")
+    event := c.Param("event") // success, failure, progress
+    
+    var payload DeploymentWebhookPayload
+    if err := c.ShouldBindJSON(&payload); err != nil {
+        c.JSON(400, gin.H{"error": "Invalid payload"})
+        return
+    }
+    
+    err := deploymentService.ProcessWebhook(c.Request.Context(), deploymentID, event, &payload)
+    if err != nil {
+        c.JSON(500, gin.H{"error": err.Error()})
+        return
+    }
+    
+    c.JSON(200, gin.H{"status": "processed"})
+}
 ```
 
-### Third-Party Integration Webhooks
-```php
-// Monitoring webhooks
-Route::post('/webhooks/monitoring/{server}', [MonitoringWebhookController::class, 'handle']);
+## WebSocket Architecture
 
-// Backup status webhooks
-Route::post('/webhooks/backup/{backup}', [BackupWebhookController::class, 'handle']);
+### WebSocket Setup
+```go
+// WebSocket upgrader
+var upgrader = websocket.Upgrader{
+    CheckOrigin: func(r *http.Request) bool {
+        return true // Configure based on your CORS policy
+    },
+}
 
-// SSL certificate webhooks
-Route::post('/webhooks/ssl/{certificate}', [SslWebhookController::class, 'handle']);
+// WebSocket handler
+func WebSocketHandler(c *gin.Context) {
+    user := c.MustGet("user").(*User)
+    
+    conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+    if err != nil {
+        return
+    }
+    defer conn.Close()
+    
+    // Create WebSocket client
+    client := &WebSocketClient{
+        conn: conn,
+        user: user,
+        send: make(chan []byte, 256),
+    }
+    
+    // Register client
+    hub.Register(client)
+    defer hub.Unregister(client)
+    
+    // Start goroutines for reading and writing
+    go client.writePump()
+    client.readPump()
+}
 ```
-
-## WebSocket Channel Definitions
 
 ### Real-Time Channels
-```php
-// Private channels for team members
-Broadcast::channel('team.{teamId}', function ($user, $teamId) {
-    return $user->teams->contains('id', $teamId);
-});
+```go
+// WebSocket hub for managing connections
+type Hub struct {
+    clients    map[*WebSocketClient]bool
+    broadcast  chan []byte
+    register   chan *WebSocketClient
+    unregister chan *WebSocketClient
+    mutex      sync.RWMutex
+}
 
-// Application deployment channels
-Broadcast::channel('application.{applicationId}', function ($user, $applicationId) {
-    return $user->hasAccessToApplication($applicationId);
-});
-
-// Server monitoring channels
-Broadcast::channel('server.{serverId}', function ($user, $serverId) {
-    return $user->hasAccessToServer($serverId);
-});
-```
-
-### Presence Channels
-```php
-// Team collaboration presence
-Broadcast::channel('team.{teamId}.presence', function ($user, $teamId) {
-    if ($user->teams->contains('id', $teamId)) {
-        return ['id' => $user->id, 'name' => $user->name];
-    }
-});
-```
-
-## API Controllers
-
-### Location: [app/Http/Controllers/Api/](mdc:app/Http/Controllers)
-
-#### Resource Controllers
-```php
-class ApplicationController extends Controller
-{
-    public function index(Request $request)
-    {
-        return ApplicationResource::collection(
-            $request->user()->currentTeam->applications()
-                ->with(['server', 'environment'])
-                ->paginate()
-        );
-    }
-    
-    public function store(StoreApplicationRequest $request)
-    {
-        $application = $request->user()->currentTeam
-            ->applications()
-            ->create($request->validated());
+func (h *Hub) Run() {
+    for {
+        select {
+        case client := <-h.register:
+            h.mutex.Lock()
+            h.clients[client] = true
+            h.mutex.Unlock()
             
-        return new ApplicationResource($application);
-    }
-    
-    public function deploy(Application $application)
-    {
-        $deployment = $application->deploy();
-        
-        return response()->json([
-            'message' => 'Deployment started',
-            'deployment_id' => $deployment->id
-        ]);
-    }
-}
-```
-
-### API Responses & Resources
-```php
-// API Resource classes
-class ApplicationResource extends JsonResource
-{
-    public function toArray($request)
-    {
-        return [
-            'id' => $this->id,
-            'name' => $this->name,
-            'fqdn' => $this->fqdn,
-            'status' => $this->status,
-            'git_repository' => $this->git_repository,
-            'git_branch' => $this->git_branch,
-            'created_at' => $this->created_at,
-            'updated_at' => $this->updated_at,
-            'server' => new ServerResource($this->whenLoaded('server')),
-            'environment' => new EnvironmentResource($this->whenLoaded('environment')),
-        ];
-    }
-}
-```
-
-## API Authentication
-
-### Sanctum Token Authentication
-```php
-// API token generation
-Route::post('/auth/tokens', function (Request $request) {
-    $request->validate([
-        'name' => 'required|string',
-        'abilities' => 'array'
-    ]);
-    
-    $token = $request->user()->createToken(
-        $request->name,
-        $request->abilities ?? []
-    );
-    
-    return response()->json([
-        'token' => $token->plainTextToken,
-        'abilities' => $token->accessToken->abilities
-    ]);
-});
-```
-
-### Team-Based Authorization
-```php
-// Team access middleware
-class EnsureTeamAccess
-{
-    public function handle($request, Closure $next)
-    {
-        $teamId = $request->route('team');
-        
-        if (!$request->user()->teams->contains('id', $teamId)) {
-            abort(403, 'Access denied to team resources');
-        }
-        
-        return $next($request);
-    }
-}
-```
-
-## Rate Limiting
-
-### API Rate Limits
-```php
-// API throttling configuration
-RateLimiter::for('api', function (Request $request) {
-    return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
-});
-
-// Deployment rate limiting
-RateLimiter::for('deployments', function (Request $request) {
-    return Limit::perMinute(10)->by($request->user()->id);
-});
-```
-
-### Webhook Rate Limiting
-```php
-// Webhook throttling
-RateLimiter::for('webhooks', function (Request $request) {
-    return Limit::perMinute(100)->by($request->ip());
-});
-```
-
-## Route Model Binding
-
-### Custom Route Bindings
-```php
-// Custom model binding for applications
-Route::bind('application', function ($value) {
-    return Application::where('uuid', $value)
-        ->orWhere('id', $value)
-        ->firstOrFail();
-});
-
-// Team-scoped model binding
-Route::bind('team_application', function ($value, $route) {
-    $teamId = $route->parameter('team');
-    return Application::whereHas('environment.project', function ($query) use ($teamId) {
-        $query->where('team_id', $teamId);
-    })->findOrFail($value);
-});
-```
-
-## API Documentation
-
-### OpenAPI Specification
-- **[openapi.json](mdc:openapi.json)** - API documentation (373KB, 8316 lines)
-- **[openapi.yaml](mdc:openapi.yaml)** - YAML format documentation (184KB, 5579 lines)
-
-### Documentation Generation
-```php
-// Swagger/OpenAPI annotations
-/**
- * @OA\Get(
- *     path="/api/v1/applications",
- *     summary="List applications",
- *     tags={"Applications"},
- *     security={{"bearerAuth":{}}},
- *     @OA\Response(
- *         response=200,
- *         description="List of applications",
- *         @OA\JsonContent(type="array", @OA\Items(ref="#/components/schemas/Application"))
- *     )
- * )
- */
-```
-
-## Error Handling
-
-### API Error Responses
-```php
-// Standardized error response format
-class ApiExceptionHandler
-{
-    public function render($request, Throwable $exception)
-    {
-        if ($request->expectsJson()) {
-            return response()->json([
-                'message' => $exception->getMessage(),
-                'error_code' => $this->getErrorCode($exception),
-                'timestamp' => now()->toISOString()
-            ], $this->getStatusCode($exception));
-        }
-        
-        return parent::render($request, $exception);
-    }
-}
-```
-
-### Validation Error Handling
-```php
-// Form request validation
-class StoreApplicationRequest extends FormRequest
-{
-    public function rules()
-    {
-        return [
-            'name' => 'required|string|max:255',
-            'git_repository' => 'required|url',
-            'git_branch' => 'required|string',
-            'server_id' => 'required|exists:servers,id',
-            'environment_id' => 'required|exists:environments,id'
-        ];
-    }
-    
-    public function failedValidation(Validator $validator)
-    {
-        throw new HttpResponseException(
-            response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422)
-        );
-    }
-}
-```
-
-## Real-Time API Integration
-
-### WebSocket Events
-```php
-// Broadcasting deployment events
-class DeploymentStarted implements ShouldBroadcast
-{
-    public $application;
-    public $deployment;
-    
-    public function broadcastOn()
-    {
-        return [
-            new PrivateChannel("application.{$this->application->id}"),
-            new PrivateChannel("team.{$this->application->team->id}")
-        ];
-    }
-    
-    public function broadcastWith()
-    {
-        return [
-            'deployment_id' => $this->deployment->id,
-            'status' => 'started',
-            'timestamp' => now()
-        ];
-    }
-}
-```
-
-### API Event Streaming
-```php
-// Server-Sent Events for real-time updates
-Route::get('/api/v1/applications/{application}/events', function (Application $application) {
-    return response()->stream(function () use ($application) {
-        while (true) {
-            $events = $application->getRecentEvents();
-            foreach ($events as $event) {
-                echo "data: " . json_encode($event) . "\n\n";
+        case client := <-h.unregister:
+            h.mutex.Lock()
+            if _, ok := h.clients[client]; ok {
+                delete(h.clients, client)
+                close(client.send)
             }
-            usleep(1000000); // 1 second
+            h.mutex.Unlock()
+            
+        case message := <-h.broadcast:
+            h.mutex.RLock()
+            for client := range h.clients {
+                select {
+                case client.send <- message:
+                default:
+                    close(client.send)
+                    delete(h.clients, client)
+                }
+            }
+            h.mutex.RUnlock()
         }
-    }, 200, [
-        'Content-Type' => 'text/event-stream',
-        'Cache-Control' => 'no-cache',
-    ]);
-});
+    }
+}
+
+// Broadcast to specific users
+func (h *Hub) BroadcastToUser(userID string, message []byte) {
+    h.mutex.RLock()
+    defer h.mutex.RUnlock()
+    
+    for client := range h.clients {
+        if client.user.ID == userID {
+            select {
+            case client.send <- message:
+            default:
+                close(client.send)
+                delete(h.clients, client)
+            }
+        }
+    }
+}
+
+// Broadcast to team members
+func (h *Hub) BroadcastToTeam(teamID string, message []byte) {
+    h.mutex.RLock()
+    defer h.mutex.RUnlock()
+    
+    for client := range h.clients {
+        if client.user.HasTeamAccess(teamID) {
+            select {
+            case client.send <- message:
+            default:
+                close(client.send)
+                delete(h.clients, client)
+            }
+        }
+    }
+}
+```
+
+## Middleware Patterns
+
+### CORS Middleware
+```go
+func CORSMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        c.Header("Access-Control-Allow-Origin", "*")
+        c.Header("Access-Control-Allow-Credentials", "true")
+        c.Header("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+        c.Header("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
+        
+        if c.Request.Method == "OPTIONS" {
+            c.AbortWithStatus(204)
+            return
+        }
+        
+        c.Next()
+    }
+}
+```
+
+### Rate Limiting Middleware
+```go
+func RateLimitMiddleware(limit int, window time.Duration) gin.HandlerFunc {
+    limiter := rate.NewLimiter(rate.Every(window/time.Duration(limit)), limit)
+    
+    return func(c *gin.Context) {
+        if !limiter.Allow() {
+            c.JSON(429, gin.H{"error": "Rate limit exceeded"})
+            c.Abort()
+            return
+        }
+        c.Next()
+    }
+}
+```
+
+### Logging Middleware
+```go
+func LoggingMiddleware(logger *zap.Logger) gin.HandlerFunc {
+    return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
+        logger.Info("HTTP Request",
+            zap.String("method", param.Method),
+            zap.String("path", param.Path),
+            zap.Int("status", param.StatusCode),
+            zap.Duration("latency", param.Latency),
+            zap.String("client_ip", param.ClientIP),
+            zap.String("user_agent", param.Request.UserAgent()),
+        )
+        return ""
+    })
+}
+```
+
+### Error Handling Middleware
+```go
+func ErrorHandlerMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        c.Next()
+        
+        // Handle any errors that occurred during request processing
+        if len(c.Errors) > 0 {
+            err := c.Errors.Last()
+            
+            // Log the error
+            logger.Error("Request error",
+                zap.Error(err.Err),
+                zap.String("path", c.Request.URL.Path),
+                zap.String("method", c.Request.Method),
+            )
+            
+            // Return appropriate error response
+            c.JSON(500, gin.H{
+                "error": "Internal server error",
+                "trace_id": c.GetString("trace_id"),
+            })
+        }
+    }
+}
+```
+
+## Request/Response Patterns
+
+### Request Validation
+```go
+// Request structs with validation
+type CreateApplicationRequest struct {
+    Name              string            `json:"name" binding:"required,min=2,max=100"`
+    Description       string            `json:"description" binding:"max=500"`
+    GitRepository     string            `json:"git_repository" binding:"required,url"`
+    GitBranch         string            `json:"git_branch" binding:"required"`
+    BuildPack         string            `json:"build_pack" binding:"required"`
+    Port              int               `json:"port" binding:"required,min=1,max=65535"`
+    ServerID          string            `json:"server_id" binding:"required,uuid"`
+    EnvironmentVars   map[string]string `json:"environment_variables"`
+}
+
+func (r *CreateApplicationRequest) Validate() error {
+    // Custom validation logic
+    if !strings.HasPrefix(r.GitRepository, "https://") {
+        return errors.New("Git repository must use HTTPS")
+    }
+    
+    if r.Port < 1 || r.Port > 65535 {
+        return errors.New("Port must be between 1 and 65535")
+    }
+    
+    return nil
+}
+```
+
+### Response Structs
+```go
+// Standard API response structure
+type APIResponse struct {
+    Data    interface{} `json:"data,omitempty"`
+    Meta    *Meta       `json:"meta,omitempty"`
+    Error   string      `json:"error,omitempty"`
+    TraceID string      `json:"trace_id,omitempty"`
+}
+
+type Meta struct {
+    Total       int    `json:"total,omitempty"`
+    Page        int    `json:"page,omitempty"`
+    PerPage     int    `json:"per_page,omitempty"`
+    HasMore     bool   `json:"has_more,omitempty"`
+    NextCursor  string `json:"next_cursor,omitempty"`
+}
+
+// Helper function for successful responses
+func SuccessResponse(data interface{}) gin.H {
+    return gin.H{"data": data}
+}
+
+// Helper function for error responses
+func ErrorResponse(err error, traceID string) gin.H {
+    return gin.H{
+        "error":    err.Error(),
+        "trace_id": traceID,
+    }
+}
 ```

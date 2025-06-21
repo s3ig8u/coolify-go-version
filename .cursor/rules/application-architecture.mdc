@@ -3,70 +3,137 @@ description:
 globs: 
 alwaysApply: false
 ---
-# Coolify Application Architecture
+# Coolify Go Application Architecture
 
-## Laravel Project Structure
+## Go Project Structure
 
-### **Core Application Directory** ([app/](mdc:app))
+### **Core Application Directory** ([internal/](mdc:internal))
 
 ```
-app/
-├── Actions/           # Business logic actions (Action pattern)
-├── Console/           # Artisan commands
-├── Contracts/         # Interface definitions
-├── Data/              # Data Transfer Objects (Spatie Laravel Data)
-├── Enums/             # Enumeration classes
-├── Events/            # Event classes
-├── Exceptions/        # Custom exception classes
-├── Helpers/           # Utility helper classes
-├── Http/              # HTTP layer (Controllers, Middleware, Requests)
-├── Jobs/              # Background job classes
-├── Listeners/         # Event listeners
-├── Livewire/          # Livewire components (Frontend)
-├── Models/            # Eloquent models (Domain entities)
-├── Notifications/     # Notification classes
-├── Policies/          # Authorization policies
-├── Providers/         # Service providers
-├── Repositories/      # Repository pattern implementations
-├── Services/          # Service layer classes
-├── Traits/            # Reusable trait classes
-└── View/              # View composers and creators
+internal/
+├── auth/              # Authentication and authorization
+├── config/            # Configuration management
+├── handlers/          # HTTP request handlers
+├── middleware/        # HTTP middleware
+├── models/            # Data models and database entities
+├── repository/        # Data access layer (repository pattern)
+├── routes/            # Route definitions
+├── services/          # Business logic services
+├── utils/             # Utility functions
+└── websocket/         # WebSocket handling
+```
+
+### **Public Packages** ([pkg/](mdc:pkg))
+```
+pkg/
+├── docker/            # Docker client and operations
+├── git/               # Git repository operations
+├── ssh/               # SSH connection management
+└── validator/         # Input validation utilities
+```
+
+### **Application Entry Points** ([cmd/](mdc:cmd))
+```
+cmd/
+├── server/            # Main server application
+│   └── main.go        # Server entry point
+└── cli/               # Command-line tools
+    └── main.go        # CLI entry point
+```
+
+### **Web Assets** ([web/](mdc:web))
+```
+web/
+├── static/            # Static assets (CSS, JS, images)
+├── templates/         # HTML templates
+└── assets/            # Build assets
 ```
 
 ## Core Domain Models
 
 ### **Infrastructure Management**
 
-#### **[Server.php](mdc:app/Models/Server.php)** (46KB, 1343 lines)
+#### **[Server](mdc:internal/models/server.go)**
 - **Purpose**: Physical/virtual server management
 - **Key Relationships**:
-  - `hasMany(Application::class)` - Deployed applications
-  - `hasMany(StandalonePostgresql::class)` - Database instances
-  - `belongsTo(Team::class)` - Team ownership
+  - `hasMany(Application)` - Deployed applications
+  - `hasMany(StandalonePostgresql)` - Database instances
+  - `belongsTo(Team)` - Team ownership
 - **Key Features**:
   - SSH connection management
   - Resource monitoring
   - Proxy configuration (Traefik/Caddy)
   - Docker daemon interaction
 
-#### **[Application.php](mdc:app/Models/Application.php)** (74KB, 1734 lines)
+```go
+type Server struct {
+    BaseModel
+    Name                string    `json:"name" gorm:"not null"`
+    Description         string    `json:"description"`
+    IPAddress           string    `json:"ip_address" gorm:"not null"`
+    Port                int       `json:"port" gorm:"default:22"`
+    Username            string    `json:"username" gorm:"not null"`
+    SSHKeyID            uuid.UUID `json:"ssh_key_id"`
+    Status              string    `json:"status" gorm:"default:'unreachable'"`
+    OSType              string    `json:"os_type"`
+    OSVersion           string    `json:"os_version"`
+    DockerVersion       string    `json:"docker_version"`
+    CPUCount            int       `json:"cpu_count"`
+    MemoryMB            int       `json:"memory_mb"`
+    DiskGB              int       `json:"disk_gb"`
+    LastPingAt          *time.Time `json:"last_ping_at"`
+    
+    // Relationships
+    TeamID              uuid.UUID `json:"team_id"`
+    Team                Team      `json:"team" gorm:"foreignKey:TeamID"`
+    Applications        []Application `json:"applications" gorm:"foreignKey:ServerID"`
+    SSHKey              PrivateKey `json:"ssh_key" gorm:"foreignKey:SSHKeyID"`
+}
+```
+
+#### **[Application](mdc:internal/models/application.go)**
 - **Purpose**: Application deployment and management
 - **Key Relationships**:
-  - `belongsTo(Server::class)` - Deployment target
-  - `belongsTo(Environment::class)` - Environment context
-  - `hasMany(ApplicationDeploymentQueue::class)` - Deployment history
+  - `belongsTo(Server)` - Deployment target
+  - `belongsTo(Environment)` - Environment context
+  - `hasMany(ApplicationDeploymentQueue)` - Deployment history
 - **Key Features**:
   - Git repository integration
   - Docker build and deployment
   - Environment variable management
   - SSL certificate handling
 
-#### **[Service.php](mdc:app/Models/Service.php)** (58KB, 1325 lines)
+```go
+type Application struct {
+    BaseModel
+    Name                string                 `json:"name" gorm:"not null;uniqueIndex"`
+    Description         string                 `json:"description"`
+    FQDN                string                 `json:"fqdn"`
+    GitRepository       string                 `json:"git_repository"`
+    GitBranch           string                 `json:"git_branch" gorm:"default:'main'"`
+    BuildPack           string                 `json:"build_pack"`
+    Port                int                    `json:"port"`
+    EnvironmentVars     datatypes.JSON         `json:"environment_variables"`
+    Status              string                 `json:"status" gorm:"default:'stopped'"`
+    ContainerID         string                 `json:"container_id"`
+    LastDeploymentID    uuid.UUID              `json:"last_deployment_id"`
+    
+    // Relationships
+    ServerID            uuid.UUID              `json:"server_id"`
+    Server              Server                 `json:"server" gorm:"foreignKey:ServerID"`
+    EnvironmentID       uuid.UUID              `json:"environment_id"`
+    Environment         Environment            `json:"environment" gorm:"foreignKey:EnvironmentID"`
+    Deployments         []ApplicationDeploymentQueue `json:"deployments" gorm:"foreignKey:ApplicationID"`
+    EnvironmentVariables []EnvironmentVariable `json:"environment_variables" gorm:"foreignKey:ApplicationID"`
+}
+```
+
+#### **[Service](mdc:internal/models/service.go)**
 - **Purpose**: Multi-container service orchestration
 - **Key Relationships**:
-  - `hasMany(ServiceApplication::class)` - Service components
-  - `hasMany(ServiceDatabase::class)` - Service databases
-  - `belongsTo(Environment::class)` - Environment context
+  - `hasMany(ServiceApplication)` - Service components
+  - `hasMany(ServiceDatabase)` - Service databases
+  - `belongsTo(Environment)` - Environment context
 - **Key Features**:
   - Docker Compose generation
   - Service dependency management
@@ -74,44 +141,61 @@ app/
 
 ### **Team & Project Organization**
 
-#### **[Team.php](mdc:app/Models/Team.php)** (8.9KB, 308 lines)
+#### **[Team](mdc:internal/models/team.go)**
 - **Purpose**: Multi-tenant team management
 - **Key Relationships**:
-  - `hasMany(User::class)` - Team members
-  - `hasMany(Project::class)` - Team projects
-  - `hasMany(Server::class)` - Team servers
+  - `hasMany(User)` - Team members
+  - `hasMany(Project)` - Team projects
+  - `hasMany(Server)` - Team servers
 - **Key Features**:
   - Resource limits and quotas
   - Team-based access control
   - Subscription management
 
-#### **[Project.php](mdc:app/Models/Project.php)** (4.3KB, 156 lines)
+```go
+type Team struct {
+    BaseModel
+    Name                string     `json:"name" gorm:"not null"`
+    Slug                string     `json:"slug" gorm:"uniqueIndex;not null"`
+    Description         string     `json:"description"`
+    AvatarURL           string     `json:"avatar_url"`
+    SubscriptionPlan    string     `json:"subscription_plan" gorm:"default:'free'"`
+    SubscriptionEndsAt  *time.Time `json:"subscription_ends_at"`
+    
+    // Relationships
+    Members             []TeamMember   `json:"members" gorm:"foreignKey:TeamID"`
+    Projects            []Project      `json:"projects" gorm:"foreignKey:TeamID"`
+    Servers             []Server       `json:"servers" gorm:"foreignKey:TeamID"`
+}
+```
+
+#### **[Project](mdc:internal/models/project.go)**
 - **Purpose**: Project organization and grouping
 - **Key Relationships**:
-  - `hasMany(Environment::class)` - Project environments
-  - `belongsTo(Team::class)` - Team ownership
+  - `hasMany(Environment)` - Project environments
+  - `belongsTo(Team)` - Team ownership
 - **Key Features**:
   - Environment isolation
   - Resource organization
 
-#### **[Environment.php](mdc:app/Models/Environment.php)**
+#### **[Environment](mdc:internal/models/environment.go)**
 - **Purpose**: Environment-specific configuration
 - **Key Relationships**:
-  - `hasMany(Application::class)` - Environment applications
-  - `hasMany(Service::class)` - Environment services
-  - `belongsTo(Project::class)` - Project context
+  - `hasMany(Application)` - Environment applications
+  - `hasMany(Service)` - Environment services
+  - `belongsTo(Project)` - Project context
 
 ### **Database Management Models**
 
 #### **Standalone Database Models**
-- **[StandalonePostgresql.php](mdc:app/Models/StandalonePostgresql.php)** (11KB, 351 lines)
-- **[StandaloneMysql.php](mdc:app/Models/StandaloneMysql.php)** (11KB, 351 lines)
-- **[StandaloneMariadb.php](mdc:app/Models/StandaloneMariadb.php)** (10KB, 337 lines)
-- **[StandaloneMongodb.php](mdc:app/Models/StandaloneMongodb.php)** (12KB, 370 lines)
-- **[StandaloneRedis.php](mdc:app/Models/StandaloneRedis.php)** (12KB, 394 lines)
-- **[StandaloneKeydb.php](mdc:app/Models/StandaloneKeydb.php)** (11KB, 347 lines)
-- **[StandaloneDragonfly.php](mdc:app/Models/StandaloneDragonfly.php)** (11KB, 347 lines)
-- **[StandaloneClickhouse.php](mdc:app/Models/StandaloneClickhouse.php)** (10KB, 336 lines)
+- **[StandalonePostgresql](mdc:internal/models/standalone_postgresql.go)**
+- **[StandaloneMysql](mdc:internal/models/standalone_mysql.go)**
+- **[StandaloneMariadb](mdc:internal/models/standalone_mariadb.go)**
+- **[StandaloneMongodb](mdc:internal/models/standalone_mongodb.go)**
+- **[StandaloneRedis](mdc:internal/models/standalone_redis.go)**
+- **[StandaloneKeydb](mdc:internal/models/standalone_keydb.go)**
+- **[StandaloneDragonfly](mdc:internal/models/standalone_dragonfly.go)**
+- **[StandaloneClickhouse](mdc:internal/models/standalone_clickhouse.go)**
 
 **Common Features**:
 - Database configuration management
@@ -121,14 +205,14 @@ app/
 
 ### **Configuration & Settings**
 
-#### **[EnvironmentVariable.php](mdc:app/Models/EnvironmentVariable.php)** (7.6KB, 219 lines)
+#### **[EnvironmentVariable](mdc:internal/models/environment_variable.go)**
 - **Purpose**: Application environment variable management
 - **Key Features**:
   - Encrypted value storage
   - Build-time vs runtime variables
   - Shared variable inheritance
 
-#### **[InstanceSettings.php](mdc:app/Models/InstanceSettings.php)** (3.2KB, 124 lines)
+#### **[InstanceSettings](mdc:internal/models/instance_settings.go)**
 - **Purpose**: Global Coolify instance configuration
 - **Key Features**:
   - FQDN and port configuration
@@ -137,232 +221,388 @@ app/
 
 ## Architectural Patterns
 
-### **Action Pattern** ([app/Actions/](mdc:app/Actions))
+### **Clean Architecture**
 
-Using [lorisleiva/laravel-actions](mdc:composer.json) for business logic encapsulation:
+#### **Domain Layer** ([internal/models/](mdc:internal/models))
+```go
+// Core business entities
+type Application struct {
+    // Domain logic and business rules
+}
 
-```php
-// Example Action structure
-class DeployApplication extends Action
-{
-    public function handle(Application $application): void
-    {
-        // Business logic for deployment
+func (a *Application) Deploy() error {
+    // Business logic for deployment
+    return nil
+}
+
+func (a *Application) Validate() error {
+    // Business validation rules
+    return nil
+}
+```
+
+#### **Repository Layer** ([internal/repository/](mdc:internal/repository))
+```go
+// Data access abstraction
+type ApplicationRepository interface {
+    Create(ctx context.Context, app *Application) error
+    GetByID(ctx context.Context, id uuid.UUID) (*Application, error)
+    GetByTeam(ctx context.Context, teamID uuid.UUID) ([]*Application, error)
+    Update(ctx context.Context, app *Application) error
+    Delete(ctx context.Context, id uuid.UUID) error
+}
+
+// GORM implementation
+type GORMApplicationRepository struct {
+    db *gorm.DB
+}
+
+func (r *GORMApplicationRepository) Create(ctx context.Context, app *Application) error {
+    return r.db.WithContext(ctx).Create(app).Error
+}
+```
+
+#### **Service Layer** ([internal/services/](mdc:internal/services))
+```go
+// Business logic services
+type ApplicationService struct {
+    repo    ApplicationRepository
+    docker  DockerService
+    git     GitService
+}
+
+func (s *ApplicationService) CreateApplication(ctx context.Context, req *CreateApplicationRequest, userID uuid.UUID) (*Application, error) {
+    // Business logic for creating application
+    app := &Application{
+        Name:          req.Name,
+        GitRepository: req.GitRepository,
+        // ... other fields
     }
     
-    public function asJob(Application $application): void
-    {
-        // Queue job implementation
+    if err := s.repo.Create(ctx, app); err != nil {
+        return nil, err
+    }
+    
+    return app, nil
+}
+
+func (s *ApplicationService) DeployApplication(ctx context.Context, appID uuid.UUID) error {
+    app, err := s.repo.GetByID(ctx, appID)
+    if err != nil {
+        return err
+    }
+    
+    // Business logic for deployment
+    return s.docker.BuildAndDeploy(ctx, app)
+}
+```
+
+#### **Handler Layer** ([internal/handlers/](mdc:internal/handlers))
+```go
+// HTTP request handlers
+type ApplicationHandler struct {
+    service *ApplicationService
+}
+
+func (h *ApplicationHandler) Create(c *gin.Context) {
+    var req CreateApplicationRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(400, gin.H{"error": "Invalid request"})
+        return
+    }
+    
+    user := c.MustGet("user").(*User)
+    app, err := h.service.CreateApplication(c.Request.Context(), &req, user.ID)
+    if err != nil {
+        c.JSON(500, gin.H{"error": err.Error()})
+        return
+    }
+    
+    c.JSON(201, gin.H{"data": app})
+}
+```
+
+### **Dependency Injection**
+
+#### **Service Container**
+```go
+// Service container for dependency injection
+type Container struct {
+    DB              *gorm.DB
+    Redis           *redis.Client
+    AuthService     *AuthService
+    UserService     *UserService
+    ApplicationService *ApplicationService
+    ServerService   *ServerService
+    DockerService   *DockerService
+    GitService      *GitService
+}
+
+func NewContainer(config *Config) *Container {
+    db := initDatabase(config)
+    redis := initRedis(config)
+    
+    return &Container{
+        DB:              db,
+        Redis:           redis,
+        AuthService:     NewAuthService(db, redis),
+        UserService:     NewUserService(db),
+        ApplicationService: NewApplicationService(db),
+        ServerService:   NewServerService(db),
+        DockerService:   NewDockerService(config),
+        GitService:      NewGitService(),
     }
 }
 ```
 
-**Key Action Categories**:
-- **Application/**: Deployment and management actions
-- **Database/**: Database operations
-- **Server/**: Server management actions
-- **Service/**: Service orchestration actions
+### **Middleware Pattern**
+```go
+// HTTP middleware for cross-cutting concerns
+func AuthMiddleware(authService *AuthService) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        token := c.GetHeader("Authorization")
+        if token == "" {
+            c.JSON(401, gin.H{"error": "Unauthorized"})
+            c.Abort()
+            return
+        }
+        
+        user, err := authService.ValidateToken(token)
+        if err != nil {
+            c.JSON(401, gin.H{"error": "Invalid token"})
+            c.Abort()
+            return
+        }
+        
+        c.Set("user", user)
+        c.Next()
+    }
+}
 
-### **Repository Pattern** ([app/Repositories/](mdc:app/Repositories))
-
-Data access abstraction layer:
-- Encapsulates database queries
-- Provides testable data layer
-- Abstracts complex query logic
-
-### **Service Layer** ([app/Services/](mdc:app/Services))
-
-Business logic services:
-- External API integrations
-- Complex business operations
-- Cross-cutting concerns
+func TeamAccessMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        user := c.MustGet("user").(*User)
+        teamID := c.Param("teamId")
+        
+        if !user.HasTeamAccess(teamID) {
+            c.JSON(403, gin.H{"error": "Access denied"})
+            c.Abort()
+            return
+        }
+        
+        c.Set("teamId", teamID)
+        c.Next()
+    }
+}
+```
 
 ## Data Flow Architecture
 
 ### **Request Lifecycle**
 
-1. **HTTP Request** → [routes/web.php](mdc:routes/web.php)
-2. **Middleware** → Authentication, authorization
-3. **Livewire Component** → [app/Livewire/](mdc:app/Livewire)
-4. **Action/Service** → Business logic execution
-5. **Model/Repository** → Data persistence
-6. **Response** → Livewire reactive update
+1. **HTTP Request** → [internal/routes/](mdc:internal/routes)
+2. **Middleware** → Authentication, authorization, logging
+3. **Handler** → [internal/handlers/](mdc:internal/handlers)
+4. **Service** → Business logic execution
+5. **Repository** → Data persistence
+6. **Response** → JSON/HTML response
 
 ### **Background Processing**
 
 1. **Job Dispatch** → Queue system (Redis)
-2. **Job Processing** → [app/Jobs/](mdc:app/Jobs)
-3. **Action Execution** → Business logic
-4. **Event Broadcasting** → Real-time updates
+2. **Job Processing** → Goroutine-based workers
+3. **Service Execution** → Business logic
+4. **Event Broadcasting** → WebSocket updates
 5. **Notification** → User feedback
 
 ## Security Architecture
 
 ### **Multi-Tenant Isolation**
 
-```php
+```go
 // Team-based query scoping
-class Application extends Model
-{
-    public function scopeOwnedByCurrentTeam($query)
-    {
-        return $query->whereHas('environment.project.team', function ($q) {
-            $q->where('id', currentTeam()->id);
-        });
-    }
+func (a *Application) ScopeByTeam(db *gorm.DB, teamID uuid.UUID) *gorm.DB {
+    return db.
+        Joins("JOIN environments ON applications.environment_id = environments.id").
+        Joins("JOIN projects ON environments.project_id = projects.id").
+        Where("projects.team_id = ?", teamID)
+}
+
+// Usage in repository
+func (r *GORMApplicationRepository) GetByTeam(ctx context.Context, teamID uuid.UUID) ([]*Application, error) {
+    var apps []*Application
+    err := r.db.WithContext(ctx).Scopes(Application{}.ScopeByTeam(r.db, teamID)).Find(&apps).Error
+    return apps, err
 }
 ```
 
-### **Authorization Layers**
+### **Authorization Patterns**
 
-1. **Team Membership** → User belongs to team
-2. **Resource Ownership** → Resource belongs to team
-3. **Policy Authorization** → [app/Policies/](mdc:app/Policies)
-4. **Environment Isolation** → Project/environment boundaries
+```go
+// Role-based authorization
+type Role string
 
-### **Data Protection**
+const (
+    RoleOwner  Role = "owner"
+    RoleAdmin  Role = "admin"
+    RoleMember Role = "member"
+    RoleViewer Role = "viewer"
+)
 
-- **Environment Variables**: Encrypted at rest
-- **SSH Keys**: Secure storage and transmission
-- **API Tokens**: Sanctum-based authentication
-- **Audit Logging**: [spatie/laravel-activitylog](mdc:composer.json)
-
-## Configuration Hierarchy
-
-### **Global Configuration**
-- **[InstanceSettings](mdc:app/Models/InstanceSettings.php)**: System-wide settings
-- **[config/](mdc:config)**: Laravel configuration files
-
-### **Team Configuration**
-- **[Team](mdc:app/Models/Team.php)**: Team-specific settings
-- **[ServerSetting](mdc:app/Models/ServerSetting.php)**: Server configurations
-
-### **Project Configuration**
-- **[ProjectSetting](mdc:app/Models/ProjectSetting.php)**: Project settings
-- **[Environment](mdc:app/Models/Environment.php)**: Environment variables
-
-### **Application Configuration**
-- **[ApplicationSetting](mdc:app/Models/ApplicationSetting.php)**: App-specific settings
-- **[EnvironmentVariable](mdc:app/Models/EnvironmentVariable.php)**: Runtime configuration
-
-## Event-Driven Architecture
-
-### **Event Broadcasting** ([app/Events/](mdc:app/Events))
-
-Real-time updates using Laravel Echo and WebSockets:
-
-```php
-// Example event structure
-class ApplicationDeploymentStarted implements ShouldBroadcast
-{
-    public function broadcastOn(): array
-    {
-        return [
-            new PrivateChannel("team.{$this->application->team->id}"),
-        ];
+func (u *User) HasTeamRole(teamID uuid.UUID, role Role) bool {
+    for _, member := range u.TeamMembers {
+        if member.TeamID == teamID && member.Role == string(role) {
+            return true
+        }
     }
+    return false
+}
+
+func (u *User) HasTeamPermission(teamID uuid.UUID, permission string) bool {
+    // Check user's role and permissions
+    return true
 }
 ```
 
-### **Event Listeners** ([app/Listeners/](mdc:app/Listeners))
+## Configuration Management
 
-- Deployment status updates
-- Resource monitoring alerts
-- Notification dispatching
-- Audit log creation
+### **Environment Configuration**
+```go
+// Configuration structure
+type Config struct {
+    Server   ServerConfig   `json:"server"`
+    Database DatabaseConfig `json:"database"`
+    Redis    RedisConfig    `json:"redis"`
+    Auth     AuthConfig     `json:"auth"`
+    Docker   DockerConfig   `json:"docker"`
+    Logging  LoggingConfig  `json:"logging"`
+}
 
-## Database Design Patterns
+type ServerConfig struct {
+    Host         string        `json:"host" env:"HOST" default:"0.0.0.0"`
+    Port         int           `json:"port" env:"PORT" default:"8080"`
+    ReadTimeout  time.Duration `json:"read_timeout" env:"READ_TIMEOUT" default:"30s"`
+    WriteTimeout time.Duration `json:"write_timeout" env:"WRITE_TIMEOUT" default:"30s"`
+}
 
-### **Polymorphic Relationships**
-
-```php
-// Environment variables can belong to multiple resource types
-class EnvironmentVariable extends Model
-{
-    public function resource(): MorphTo
-    {
-        return $this->morphTo();
+// Configuration loading
+func LoadConfig() (*Config, error) {
+    config := &Config{}
+    
+    if err := envconfig.Process("", config); err != nil {
+        return nil, err
     }
+    
+    return config, nil
 }
 ```
 
-### **Team-Based Soft Scoping**
+## Error Handling
 
-All major resources include team-based query scoping:
+### **Custom Error Types**
+```go
+// Domain-specific errors
+type ApplicationError struct {
+    Code    string `json:"code"`
+    Message string `json:"message"`
+    Details map[string]interface{} `json:"details,omitempty"`
+}
 
-```php
-// Automatic team filtering
-$applications = Application::ownedByCurrentTeam()->get();
-$servers = Server::ownedByCurrentTeam()->get();
+func (e *ApplicationError) Error() string {
+    return e.Message
+}
+
+var (
+    ErrApplicationNotFound = &ApplicationError{
+        Code:    "APPLICATION_NOT_FOUND",
+        Message: "Application not found",
+    }
+    
+    ErrDeploymentFailed = &ApplicationError{
+        Code:    "DEPLOYMENT_FAILED",
+        Message: "Application deployment failed",
+    }
+)
 ```
 
-### **Configuration Inheritance**
-
-Environment variables cascade from:
-1. **Shared Variables** → Team-wide defaults
-2. **Project Variables** → Project-specific overrides
-3. **Application Variables** → Application-specific values
-
-## Integration Patterns
-
-### **Git Provider Integration**
-
-Abstracted git operations supporting:
-- **GitHub**: [app/Models/GithubApp.php](mdc:app/Models/GithubApp.php)
-- **GitLab**: [app/Models/GitlabApp.php](mdc:app/Models/GitlabApp.php)
-- **Bitbucket**: Webhook integration
-- **Gitea**: Self-hosted Git support
-
-### **Docker Integration**
-
-- **Container Management**: Direct Docker API communication
-- **Image Building**: Dockerfile and Buildpack support
-- **Network Management**: Custom Docker networks
-- **Volume Management**: Persistent storage handling
-
-### **SSH Communication**
-
-- **[phpseclib/phpseclib](mdc:composer.json)**: Secure SSH connections
-- **Multiplexing**: Connection pooling for efficiency
-- **Key Management**: [PrivateKey](mdc:app/Models/PrivateKey.php) model
+### **Error Handling Middleware**
+```go
+func ErrorHandlerMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        c.Next()
+        
+        if len(c.Errors) > 0 {
+            err := c.Errors.Last()
+            
+            // Log the error
+            logger.Error("Request error",
+                zap.Error(err.Err),
+                zap.String("path", c.Request.URL.Path),
+                zap.String("method", c.Request.Method),
+            )
+            
+            // Return appropriate error response
+            c.JSON(500, gin.H{
+                "error": "Internal server error",
+                "trace_id": c.GetString("trace_id"),
+            })
+        }
+    }
+}
+```
 
 ## Testing Architecture
 
-### **Test Structure** ([tests/](mdc:tests))
-
+### **Unit Testing**
+```go
+// Service layer testing
+func TestApplicationService_CreateApplication(t *testing.T) {
+    // Setup
+    mockRepo := &MockApplicationRepository{}
+    service := NewApplicationService(mockRepo)
+    
+    // Test data
+    req := &CreateApplicationRequest{
+        Name: "test-app",
+        GitRepository: "https://github.com/user/repo.git",
+    }
+    
+    // Expectations
+    mockRepo.On("Create", mock.Anything, mock.AnythingOfType("*Application")).Return(nil)
+    
+    // Execute
+    app, err := service.CreateApplication(context.Background(), req, uuid.New())
+    
+    // Assert
+    assert.NoError(t, err)
+    assert.NotNil(t, app)
+    assert.Equal(t, req.Name, app.Name)
+    mockRepo.AssertExpectations(t)
+}
 ```
-tests/
-├── Feature/           # Integration tests
-├── Unit/              # Unit tests
-├── Browser/           # Dusk browser tests
-├── Traits/            # Test helper traits
-├── Pest.php           # Pest configuration
-└── TestCase.php       # Base test case
+
+### **Integration Testing**
+```go
+// Database integration testing
+func TestApplicationRepository_Integration(t *testing.T) {
+    // Setup test database
+    db := setupTestDB(t)
+    repo := NewGORMApplicationRepository(db)
+    
+    // Test data
+    app := &Application{
+        Name: "test-app",
+        GitRepository: "https://github.com/user/repo.git",
+    }
+    
+    // Execute
+    err := repo.Create(context.Background(), app)
+    
+    // Assert
+    assert.NoError(t, err)
+    assert.NotNil(t, app.ID)
+    
+    // Cleanup
+    cleanupTestDB(t, db)
+}
 ```
-
-### **Testing Patterns**
-
-- **Feature Tests**: Full request lifecycle testing
-- **Unit Tests**: Individual class/method testing
-- **Browser Tests**: End-to-end user workflows
-- **Database Testing**: Factories and seeders
-
-## Performance Considerations
-
-### **Query Optimization**
-
-- **Eager Loading**: Prevent N+1 queries
-- **Query Scoping**: Team-based filtering
-- **Database Indexing**: Optimized for common queries
-
-### **Caching Strategy**
-
-- **Redis**: Session and cache storage
-- **Model Caching**: Frequently accessed data
-- **Query Caching**: Expensive query results
-
-### **Background Processing**
-
-- **Queue Workers**: Horizon-managed job processing
-- **Job Batching**: Related job grouping
-- **Failed Job Handling**: Automatic retry logic

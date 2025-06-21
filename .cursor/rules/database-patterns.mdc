@@ -3,42 +3,42 @@ description:
 globs: 
 alwaysApply: false
 ---
-# Coolify Database Architecture & Patterns
+# Coolify Go Database Architecture & Patterns
 
 ## Database Strategy
 
-Coolify uses **PostgreSQL 15** as the primary database with **Redis 7** for caching and real-time features. The architecture supports managing multiple external databases across different servers.
+Coolify Go uses **PostgreSQL 15** as the primary database with **Redis 7** for caching and real-time features. The architecture supports managing multiple external databases across different servers.
 
 ## Primary Database (PostgreSQL)
 
 ### Core Tables & Models
 
 #### User & Team Management
-- **[User.php](mdc:app/Models/User.php)** - User authentication and profiles
-- **[Team.php](mdc:app/Models/Team.php)** - Multi-tenant organization structure
-- **[TeamInvitation.php](mdc:app/Models/TeamInvitation.php)** - Team collaboration invitations
-- **[PersonalAccessToken.php](mdc:app/Models/PersonalAccessToken.php)** - API token management
+- **[User](mdc:internal/models/user.go)** - User authentication and profiles
+- **[Team](mdc:internal/models/team.go)** - Multi-tenant organization structure
+- **[TeamInvitation](mdc:internal/models/team_invitation.go)** - Team collaboration invitations
+- **[PersonalAccessToken](mdc:internal/models/personal_access_token.go)** - API token management
 
 #### Infrastructure Management
-- **[Server.php](mdc:app/Models/Server.php)** - Physical/virtual server definitions (46KB, complex)
-- **[PrivateKey.php](mdc:app/Models/PrivateKey.php)** - SSH key management
-- **[ServerSetting.php](mdc:app/Models/ServerSetting.php)** - Server-specific configurations
+- **[Server](mdc:internal/models/server.go)** - Physical/virtual server definitions
+- **[PrivateKey](mdc:internal/models/private_key.go)** - SSH key management
+- **[ServerSetting](mdc:internal/models/server_setting.go)** - Server-specific configurations
 
 #### Project Organization
-- **[Project.php](mdc:app/Models/Project.php)** - Project containers for applications
-- **[Environment.php](mdc:app/Models/Environment.php)** - Environment isolation (staging, production, etc.)
-- **[ProjectSetting.php](mdc:app/Models/ProjectSetting.php)** - Project-specific settings
+- **[Project](mdc:internal/models/project.go)** - Project containers for applications
+- **[Environment](mdc:internal/models/environment.go)** - Environment isolation (staging, production, etc.)
+- **[ProjectSetting](mdc:internal/models/project_setting.go)** - Project-specific settings
 
 #### Application Deployment
-- **[Application.php](mdc:app/Models/Application.php)** - Main application entity (74KB, highly complex)
-- **[ApplicationSetting.php](mdc:app/Models/ApplicationSetting.php)** - Application configurations
-- **[ApplicationDeploymentQueue.php](mdc:app/Models/ApplicationDeploymentQueue.php)** - Deployment orchestration
-- **[ApplicationPreview.php](mdc:app/Models/ApplicationPreview.php)** - Preview environment management
+- **[Application](mdc:internal/models/application.go)** - Main application entity
+- **[ApplicationSetting](mdc:internal/models/application_setting.go)** - Application configurations
+- **[ApplicationDeploymentQueue](mdc:internal/models/application_deployment_queue.go)** - Deployment orchestration
+- **[ApplicationPreview](mdc:internal/models/application_preview.go)** - Preview environment management
 
 #### Service Management
-- **[Service.php](mdc:app/Models/Service.php)** - Service definitions (58KB, complex)
-- **[ServiceApplication.php](mdc:app/Models/ServiceApplication.php)** - Service components
-- **[ServiceDatabase.php](mdc:app/Models/ServiceDatabase.php)** - Service-attached databases
+- **[Service](mdc:internal/models/service.go)** - Service definitions
+- **[ServiceApplication](mdc:internal/models/service_application.go)** - Service components
+- **[ServiceDatabase](mdc:internal/models/service_database.go)** - Service-attached databases
 
 ## Database Type Support
 
@@ -46,87 +46,99 @@ Coolify uses **PostgreSQL 15** as the primary database with **Redis 7** for cach
 Each database type has its own dedicated model with specific configurations:
 
 #### SQL Databases
-- **[StandalonePostgresql.php](mdc:app/Models/StandalonePostgresql.php)** - PostgreSQL instances
-- **[StandaloneMysql.php](mdc:app/Models/StandaloneMysql.php)** - MySQL instances  
-- **[StandaloneMariadb.php](mdc:app/Models/StandaloneMariadb.php)** - MariaDB instances
+- **[StandalonePostgresql](mdc:internal/models/standalone_postgresql.go)** - PostgreSQL instances
+- **[StandaloneMysql](mdc:internal/models/standalone_mysql.go)** - MySQL instances  
+- **[StandaloneMariadb](mdc:internal/models/standalone_mariadb.go)** - MariaDB instances
 
 #### NoSQL & Analytics
-- **[StandaloneMongodb.php](mdc:app/Models/StandaloneMongodb.php)** - MongoDB instances
-- **[StandaloneClickhouse.php](mdc:app/Models/StandaloneClickhouse.php)** - ClickHouse analytics
+- **[StandaloneMongodb](mdc:internal/models/standalone_mongodb.go)** - MongoDB instances
+- **[StandaloneClickhouse](mdc:internal/models/standalone_clickhouse.go)** - ClickHouse analytics
 
 #### Caching & In-Memory
-- **[StandaloneRedis.php](mdc:app/Models/StandaloneRedis.php)** - Redis instances
-- **[StandaloneKeydb.php](mdc:app/Models/StandaloneKeydb.php)** - KeyDB instances
-- **[StandaloneDragonfly.php](mdc:app/Models/StandaloneDragonfly.php)** - Dragonfly instances
+- **[StandaloneRedis](mdc:internal/models/standalone_redis.go)** - Redis instances
+- **[StandaloneKeydb](mdc:internal/models/standalone_keydb.go)** - KeyDB instances
+- **[StandaloneDragonfly](mdc:internal/models/standalone_dragonfly.go)** - Dragonfly instances
 
 ## Configuration Management
 
 ### Environment Variables
-- **[EnvironmentVariable.php](mdc:app/Models/EnvironmentVariable.php)** - Application-specific environment variables
-- **[SharedEnvironmentVariable.php](mdc:app/Models/SharedEnvironmentVariable.php)** - Shared across applications
+- **[EnvironmentVariable](mdc:internal/models/environment_variable.go)** - Application-specific environment variables
+- **[SharedEnvironmentVariable](mdc:internal/models/shared_environment_variable.go)** - Shared across applications
 
 ### Settings Hierarchy
-- **[InstanceSettings.php](mdc:app/Models/InstanceSettings.php)** - Global Coolify instance settings
-- **[ServerSetting.php](mdc:app/Models/ServerSetting.php)** - Server-specific settings
-- **[ProjectSetting.php](mdc:app/Models/ProjectSetting.php)** - Project-level settings
-- **[ApplicationSetting.php](mdc:app/Models/ApplicationSetting.php)** - Application settings
+- **[InstanceSettings](mdc:internal/models/instance_settings.go)** - Global Coolify instance settings
+- **[ServerSetting](mdc:internal/models/server_setting.go)** - Server-specific settings
+- **[ProjectSetting](mdc:internal/models/project_setting.go)** - Project-level settings
+- **[ApplicationSetting](mdc:internal/models/application_setting.go)** - Application settings
 
 ## Storage & Backup Systems
 
 ### Storage Management
-- **[S3Storage.php](mdc:app/Models/S3Storage.php)** - S3-compatible storage configurations
-- **[LocalFileVolume.php](mdc:app/Models/LocalFileVolume.php)** - Local filesystem volumes
-- **[LocalPersistentVolume.php](mdc:app/Models/LocalPersistentVolume.php)** - Persistent volume management
+- **[S3Storage](mdc:internal/models/s3_storage.go)** - S3-compatible storage configurations
+- **[LocalFileVolume](mdc:internal/models/local_file_volume.go)** - Local filesystem volumes
+- **[LocalPersistentVolume](mdc:internal/models/local_persistent_volume.go)** - Persistent volume management
 
 ### Backup Infrastructure
-- **[ScheduledDatabaseBackup.php](mdc:app/Models/ScheduledDatabaseBackup.php)** - Automated backup scheduling
-- **[ScheduledDatabaseBackupExecution.php](mdc:app/Models/ScheduledDatabaseBackupExecution.php)** - Backup execution tracking
+- **[ScheduledDatabaseBackup](mdc:internal/models/scheduled_database_backup.go)** - Automated backup scheduling
+- **[ScheduledDatabaseBackupExecution](mdc:internal/models/scheduled_database_backup_execution.go)** - Backup execution tracking
 
 ### Task Scheduling
-- **[ScheduledTask.php](mdc:app/Models/ScheduledTask.php)** - Cron job management
-- **[ScheduledTaskExecution.php](mdc:app/Models/ScheduledTaskExecution.php)** - Task execution history
+- **[ScheduledTask](mdc:internal/models/scheduled_task.go)** - Cron job management
+- **[ScheduledTaskExecution](mdc:internal/models/scheduled_task_execution.go)** - Task execution history
 
 ## Notification & Integration Models
 
 ### Notification Channels
-- **[EmailNotificationSettings.php](mdc:app/Models/EmailNotificationSettings.php)** - Email notifications
-- **[DiscordNotificationSettings.php](mdc:app/Models/DiscordNotificationSettings.php)** - Discord integration
-- **[SlackNotificationSettings.php](mdc:app/Models/SlackNotificationSettings.php)** - Slack integration
-- **[TelegramNotificationSettings.php](mdc:app/Models/TelegramNotificationSettings.php)** - Telegram bot
-- **[PushoverNotificationSettings.php](mdc:app/Models/PushoverNotificationSettings.php)** - Pushover notifications
+- **[EmailNotificationSettings](mdc:internal/models/email_notification_settings.go)** - Email notifications
+- **[DiscordNotificationSettings](mdc:internal/models/discord_notification_settings.go)** - Discord integration
+- **[SlackNotificationSettings](mdc:internal/models/slack_notification_settings.go)** - Slack integration
+- **[TelegramNotificationSettings](mdc:internal/models/telegram_notification_settings.go)** - Telegram bot
+- **[PushoverNotificationSettings](mdc:internal/models/pushover_notification_settings.go)** - Pushover notifications
 
 ### Source Control Integration
-- **[GithubApp.php](mdc:app/Models/GithubApp.php)** - GitHub App integration
-- **[GitlabApp.php](mdc:app/Models/GitlabApp.php)** - GitLab integration
+- **[GithubApp](mdc:internal/models/github_app.go)** - GitHub App integration
+- **[GitlabApp](mdc:internal/models/gitlab_app.go)** - GitLab integration
 
 ### OAuth & Authentication
-- **[OauthSetting.php](mdc:app/Models/OauthSetting.php)** - OAuth provider configurations
+- **[OauthSetting](mdc:internal/models/oauth_setting.go)** - OAuth provider configurations
 
 ## Docker & Container Management
 
 ### Container Orchestration
-- **[StandaloneDocker.php](mdc:app/Models/StandaloneDocker.php)** - Standalone Docker containers
-- **[SwarmDocker.php](mdc:app/Models/SwarmDocker.php)** - Docker Swarm management
+- **[StandaloneDocker](mdc:internal/models/standalone_docker.go)** - Standalone Docker containers
+- **[SwarmDocker](mdc:internal/models/swarm_docker.go)** - Docker Swarm management
 
 ### SSL & Security
-- **[SslCertificate.php](mdc:app/Models/SslCertificate.php)** - SSL certificate management
+- **[SslCertificate](mdc:internal/models/ssl_certificate.go)** - SSL certificate management
 
 ## Database Migration Strategy
 
-### Migration Location: [database/migrations/](mdc:database/migrations)
+### Migration Location: [migrations/](mdc:migrations)
 
 #### Migration Patterns
-```php
+```go
 // Typical Coolify migration structure
-Schema::create('applications', function (Blueprint $table) {
-    $table->id();
-    $table->string('name');
-    $table->string('fqdn')->nullable();
-    $table->json('environment_variables')->nullable();
-    $table->foreignId('destination_id');
-    $table->foreignId('source_id');
-    $table->timestamps();
-});
+func CreateApplicationsTable(db *gorm.DB) error {
+    return db.AutoMigrate(&Application{})
+}
+
+// Manual migration example
+func CreateApplicationsTableManual(db *sql.DB) error {
+    query := `
+    CREATE TABLE IF NOT EXISTS applications (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(255) NOT NULL,
+        fqdn VARCHAR(255),
+        environment_variables JSONB,
+        destination_id UUID REFERENCES servers(id),
+        source_id UUID REFERENCES sources(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    `
+    _, err := db.Exec(query)
+    return err
+}
 ```
 
 ### Schema Versioning
@@ -134,48 +146,135 @@ Schema::create('applications', function (Blueprint $table) {
 - **Data migrations** for complex transformations
 - **Rollback support** for deployment safety
 
-## Eloquent Model Patterns
+## GORM Model Patterns
 
 ### Base Model Structure
-- **[BaseModel.php](mdc:app/Models/BaseModel.php)** - Common model functionality
+- **[BaseModel](mdc:internal/models/base_model.go)** - Common model functionality
 - **UUID primary keys** for distributed systems
 - **Soft deletes** for audit trails
-- **Activity logging** with Spatie package
+- **Activity logging** with custom implementation
 
-### Relationship Patterns
-```php
-// Typical relationship structure in Application model
-class Application extends Model
-{
-    public function server()
-    {
-        return $this->belongsTo(Server::class);
-    }
+### Model Structure
+```go
+// Base model with common fields
+type BaseModel struct {
+    ID        uuid.UUID  `json:"id" gorm:"type:uuid;default:gen_random_uuid();primary_key"`
+    CreatedAt time.Time  `json:"created_at" gorm:"autoCreateTime"`
+    UpdatedAt time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
+    DeletedAt *time.Time `json:"deleted_at,omitempty" gorm:"index"`
+}
+
+// Example Application model
+type Application struct {
+    BaseModel
+    Name                string                 `json:"name" gorm:"not null;uniqueIndex"`
+    Description         string                 `json:"description"`
+    FQDN                string                 `json:"fqdn"`
+    GitRepository       string                 `json:"git_repository"`
+    GitBranch           string                 `json:"git_branch" gorm:"default:'main'"`
+    BuildPack           string                 `json:"build_pack"`
+    Port                int                    `json:"port"`
+    EnvironmentVars     datatypes.JSON         `json:"environment_variables"`
+    Status              string                 `json:"status" gorm:"default:'stopped'"`
     
-    public function environment()
-    {
-        return $this->belongsTo(Environment::class);
-    }
-    
-    public function deployments()
-    {
-        return $this->hasMany(ApplicationDeploymentQueue::class);
-    }
-    
-    public function environmentVariables()
-    {
-        return $this->hasMany(EnvironmentVariable::class);
-    }
+    // Relationships
+    ServerID            uuid.UUID              `json:"server_id"`
+    Server              Server                 `json:"server" gorm:"foreignKey:ServerID"`
+    EnvironmentID       uuid.UUID              `json:"environment_id"`
+    Environment         Environment            `json:"environment" gorm:"foreignKey:EnvironmentID"`
+    Deployments         []ApplicationDeploymentQueue `json:"deployments" gorm:"foreignKey:ApplicationID"`
+    EnvironmentVariables []EnvironmentVariable `json:"environment_variables" gorm:"foreignKey:ApplicationID"`
+}
+
+// Table name
+func (Application) TableName() string {
+    return "applications"
 }
 ```
 
-### Model Traits
-```php
-// Common traits used across models
-use SoftDeletes;
-use LogsActivity;
-use HasFactory;
-use HasUuids;
+### Relationship Patterns
+```go
+// Example relationship methods
+func (a *Application) GetServer() (*Server, error) {
+    var server Server
+    err := db.Preload("Team").First(&server, a.ServerID).Error
+    return &server, err
+}
+
+func (a *Application) GetDeployments() ([]ApplicationDeploymentQueue, error) {
+    var deployments []ApplicationDeploymentQueue
+    err := db.Where("application_id = ?", a.ID).Find(&deployments).Error
+    return deployments, err
+}
+
+func (a *Application) GetEnvironmentVariables() ([]EnvironmentVariable, error) {
+    var envVars []EnvironmentVariable
+    err := db.Where("application_id = ?", a.ID).Find(&envVars).Error
+    return envVars, err
+}
+```
+
+### Model Hooks
+```go
+// GORM hooks for model lifecycle
+func (a *Application) BeforeCreate(tx *gorm.DB) error {
+    if a.ID == uuid.Nil {
+        a.ID = uuid.New()
+    }
+    return nil
+}
+
+func (a *Application) AfterCreate(tx *gorm.DB) error {
+    // Log activity
+    return logActivity(tx, "application_created", a.ID)
+}
+
+func (a *Application) BeforeUpdate(tx *gorm.DB) error {
+    // Validate changes
+    return a.validateChanges()
+}
+```
+
+## Repository Pattern
+
+### Repository Interface
+```go
+// Repository interface for data access
+type ApplicationRepository interface {
+    Create(ctx context.Context, app *Application) error
+    GetByID(ctx context.Context, id uuid.UUID) (*Application, error)
+    GetByTeam(ctx context.Context, teamID uuid.UUID) ([]*Application, error)
+    Update(ctx context.Context, app *Application) error
+    Delete(ctx context.Context, id uuid.UUID) error
+    GetByServer(ctx context.Context, serverID uuid.UUID) ([]*Application, error)
+}
+
+// GORM implementation
+type GORMApplicationRepository struct {
+    db *gorm.DB
+}
+
+func (r *GORMApplicationRepository) Create(ctx context.Context, app *Application) error {
+    return r.db.WithContext(ctx).Create(app).Error
+}
+
+func (r *GORMApplicationRepository) GetByID(ctx context.Context, id uuid.UUID) (*Application, error) {
+    var app Application
+    err := r.db.WithContext(ctx).Preload("Server").Preload("Environment").First(&app, id).Error
+    return &app, err
+}
+
+func (r *GORMApplicationRepository) GetByTeam(ctx context.Context, teamID uuid.UUID) ([]*Application, error) {
+    var apps []*Application
+    err := r.db.WithContext(ctx).
+        Joins("JOIN environments ON applications.environment_id = environments.id").
+        Joins("JOIN projects ON environments.project_id = projects.id").
+        Where("projects.team_id = ?", teamID).
+        Preload("Server").
+        Preload("Environment").
+        Find(&apps).Error
+    return apps, err
+}
 ```
 
 ## Caching Strategy (Redis)
@@ -194,113 +293,145 @@ coolify:deployment:{deployment_id}:logs
 coolify:user:{user_id}:teams
 ```
 
+### Redis Implementation
+```go
+// Redis client setup
+type RedisClient struct {
+    client *redis.Client
+}
+
+func NewRedisClient(config *Config) *RedisClient {
+    client := redis.NewClient(&redis.Options{
+        Addr:     config.Redis.Addr,
+        Password: config.Redis.Password,
+        DB:       config.Redis.DB,
+    })
+    
+    return &RedisClient{client: client}
+}
+
+// Cache operations
+func (r *RedisClient) SetSession(ctx context.Context, sessionID string, data interface{}, expiration time.Duration) error {
+    key := fmt.Sprintf("coolify:session:%s", sessionID)
+    return r.client.Set(ctx, key, data, expiration).Err()
+}
+
+func (r *RedisClient) GetSession(ctx context.Context, sessionID string) (string, error) {
+    key := fmt.Sprintf("coolify:session:%s", sessionID)
+    return r.client.Get(ctx, key).Result()
+}
+
+func (r *RedisClient) SetServerStatus(ctx context.Context, serverID uuid.UUID, status string) error {
+    key := fmt.Sprintf("coolify:server:%s:status", serverID)
+    return r.client.Set(ctx, key, status, time.Hour).Err()
+}
+```
+
 ## Query Optimization Patterns
 
 ### Eager Loading
-```php
+```go
 // Optimized queries with relationships
-$applications = Application::with([
-    'server',
-    'environment.project',
-    'environmentVariables',
-    'deployments' => function ($query) {
-        $query->latest()->limit(5);
-    }
-])->get();
-```
-
-### Chunking for Large Datasets
-```php
-// Processing large datasets efficiently
-Server::chunk(100, function ($servers) {
-    foreach ($servers as $server) {
-        // Process server monitoring
-    }
-});
-```
-
-### Database Indexes
-- **Primary keys** on all tables
-- **Foreign key indexes** for relationships
-- **Composite indexes** for common queries
-- **Unique constraints** for business rules
-
-## Data Consistency Patterns
-
-### Database Transactions
-```php
-// Atomic operations for deployment
-DB::transaction(function () {
-    $application = Application::create($data);
-    $application->environmentVariables()->createMany($envVars);
-    $application->deployments()->create(['status' => 'queued']);
-});
-```
-
-### Model Events
-```php
-// Automatic cleanup on model deletion
-class Application extends Model
-{
-    protected static function booted()
-    {
-        static::deleting(function ($application) {
-            $application->environmentVariables()->delete();
-            $application->deployments()->delete();
-        });
-    }
+func GetApplicationsWithRelations(db *gorm.DB, teamID uuid.UUID) ([]*Application, error) {
+    var applications []*Application
+    err := db.
+        Joins("JOIN environments ON applications.environment_id = environments.id").
+        Joins("JOIN projects ON environments.project_id = projects.id").
+        Where("projects.team_id = ?", teamID).
+        Preload("Server").
+        Preload("Environment.Project").
+        Preload("EnvironmentVariables").
+        Preload("Deployments", func(db *gorm.DB) *gorm.DB {
+            return db.Order("created_at DESC").Limit(5)
+        }).
+        Find(&applications).Error
+    
+    return applications, err
 }
 ```
 
-## Backup & Recovery
+### Query Scoping
+```go
+// Team-based query scoping
+func (a *Application) ScopeByTeam(db *gorm.DB, teamID uuid.UUID) *gorm.DB {
+    return db.
+        Joins("JOIN environments ON applications.environment_id = environments.id").
+        Joins("JOIN projects ON environments.project_id = projects.id").
+        Where("projects.team_id = ?", teamID)
+}
 
-### Database Backup Strategy
-- **Automated PostgreSQL backups** via scheduled tasks
-- **Point-in-time recovery** capability
-- **Cross-region backup** replication
-- **Backup verification** and testing
-
-### Data Export/Import
-- **Application configurations** export/import
-- **Environment variable** bulk operations
-- **Server configurations** backup and restore
-
-## Performance Monitoring
-
-### Query Performance
-- **Laravel Telescope** for development debugging
-- **Slow query logging** in production
-- **Database connection** pooling
-- **Read replica** support for scaling
-
-### Metrics Collection
-- **Database size** monitoring
-- **Connection count** tracking
-- **Query execution time** analysis
-- **Cache hit rates** monitoring
-
-## Multi-Tenancy Pattern
-
-### Team-Based Isolation
-```php
-// Global scope for team-based filtering
-class Application extends Model
-{
-    protected static function booted()
-    {
-        static::addGlobalScope('team', function (Builder $builder) {
-            if (auth()->user()) {
-                $builder->whereHas('environment.project', function ($query) {
-                    $query->where('team_id', auth()->user()->currentTeam->id);
-                });
-            }
-        });
-    }
+// Usage
+func GetTeamApplications(db *gorm.DB, teamID uuid.UUID) ([]*Application, error) {
+    var apps []*Application
+    err := db.Scopes(Application{}.ScopeByTeam(db, teamID)).Find(&apps).Error
+    return apps, err
 }
 ```
 
-### Data Separation
-- **Team-scoped queries** by default
-- **Cross-team access** controls
-- **Admin access** patterns
-- **Data isolation** guarantees
+### Transaction Management
+```go
+// Transaction wrapper
+func (r *GORMApplicationRepository) CreateWithTransaction(ctx context.Context, app *Application) error {
+    return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+        // Create application
+        if err := tx.Create(app).Error; err != nil {
+            return err
+        }
+        
+        // Create default environment variables
+        defaultVars := []EnvironmentVariable{
+            {ApplicationID: app.ID, Key: "NODE_ENV", Value: "production"},
+            {ApplicationID: app.ID, Key: "PORT", Value: fmt.Sprintf("%d", app.Port)},
+        }
+        
+        if err := tx.Create(&defaultVars).Error; err != nil {
+            return err
+        }
+        
+        return nil
+    })
+}
+```
+
+## Database Connection Management
+
+### Connection Pool Configuration
+```go
+// Database connection setup
+func InitDatabase(config *Config) (*gorm.DB, error) {
+    dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+        config.DB.Host, config.DB.Port, config.DB.User, config.DB.Password, config.DB.Name, config.DB.SSLMode)
+    
+    db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+        Logger: logger.Default.LogMode(logger.Info),
+    })
+    if err != nil {
+        return nil, err
+    }
+    
+    // Configure connection pool
+    sqlDB, err := db.DB()
+    if err != nil {
+        return nil, err
+    }
+    
+    sqlDB.SetMaxIdleConns(config.DB.MaxIdleConns)
+    sqlDB.SetMaxOpenConns(config.DB.MaxOpenConns)
+    sqlDB.SetConnMaxLifetime(config.DB.ConnMaxLifetime)
+    
+    return db, nil
+}
+```
+
+### Health Checks
+```go
+// Database health check
+func (r *GORMApplicationRepository) HealthCheck(ctx context.Context) error {
+    sqlDB, err := r.db.DB()
+    if err != nil {
+        return err
+    }
+    
+    return sqlDB.PingContext(ctx)
+}
+```

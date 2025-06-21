@@ -1,0 +1,1460 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Functional Requirements Document (FRD)
+# Coolify Go - Technical Implementation Specifications
+
+## 📋 Document Information
+
+| Field | Value |
+|-------|-------|
+| **Product Name** | Coolify Go |
+| **Version** | v1.4.0 |
+| **Document Version** | 1.0 |
+| **Last Updated** | June 21, 2025 |
+| **Author** | Coolify Go Development Team |
+| **Status** | Technical Specification |
+| **Related Documents** | PRD.md, API_SPECIFICATION.md |
+
+---
+
+## 🎯 Document Purpose
+
+This Functional Requirements Document (FRD) provides detailed technical specifications for implementing the Coolify Go platform as outlined in the Product Requirements Document (PRD). It serves as a blueprint for developers, architects, and QA teams to understand the exact functional behavior expected from each system component.
+
+---
+
+## 🏗️ System Architecture Overview
+
+### **Current Architecture (v1.4.0)**
+```go
+// High-level system components
+┌─────────────────────────────────────────────────────────────┐
+│                    HTTP Server Layer                       │
+│  - Gin/Echo HTTP Router                                    │
+│  - Middleware (Auth, CORS, Logging, Rate Limiting)         │
+│  - Static File Serving                                     │
+└─────────────────────────────────────────────────────────────┘
+                               │
+┌─────────────────────────────────────────────────────────────┐
+│                   API Handler Layer                        │
+│  - Health Check Handlers                                   │
+│  - Version Information Handlers                            │
+│  - Configuration Management                                 │
+└─────────────────────────────────────────────────────────────┘
+                               │
+┌─────────────────────────────────────────────────────────────┐
+│                   Business Logic Layer                     │
+│  - Health Monitoring Service                               │
+│  - Configuration Service                                    │
+│  - Database Connection Management                          │
+└─────────────────────────────────────────────────────────────┘
+                               │
+┌─────────────────────────────────────────────────────────────┐
+│                   Data Access Layer                        │
+│  - PostgreSQL Connection Pool                              │
+│  - Redis Connection Pool                                   │
+│  - Environment Configuration                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### **Target Architecture (Full Implementation)**
+```go
+// Complete system architecture
+┌─────────────────────────────────────────────────────────────┐
+│                    Frontend Layer                          │
+│  - React/Vue SPA                                           │
+│  - WebSocket Real-time Updates                             │
+│  - Progressive Web App (PWA)                               │
+└─────────────────────────────────────────────────────────────┘
+                               │
+┌─────────────────────────────────────────────────────────────┐
+│                    API Gateway                             │
+│  - REST API Endpoints                                      │
+│  - GraphQL Interface                                       │
+│  - WebSocket Server                                        │
+│  - Authentication & Authorization                          │
+└─────────────────────────────────────────────────────────────┘
+                               │
+┌─────────────────────────────────────────────────────────────┐
+│                   Core Services                            │
+│  - User Management Service                                 │
+│  - Application Management Service                          │
+│  - Deployment Engine Service                               │
+│  - Server Management Service                               │
+│  - Notification Service                                     │
+└─────────────────────────────────────────────────────────────┘
+                               │
+┌─────────────────────────────────────────────────────────────┐
+│                 Infrastructure Services                    │
+│  - Docker Orchestration                                    │
+│  - Git Repository Management                               │
+│  - SSH Connection Management                               │
+│  - Reverse Proxy Management (Traefik)                      │
+│  - SSL Certificate Management                              │
+└─────────────────────────────────────────────────────────────┘
+                               │
+┌─────────────────────────────────────────────────────────────┐
+│                    Data Layer                              │
+│  - PostgreSQL (Primary Data)                              │
+│  - Redis (Cache & Sessions)                               │
+│  - File System (Logs, Backups)                            │
+│  - Object Storage (S3-compatible)                         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📊 Database Schema Requirements
+
+### **Core Entities**
+
+#### **Users Table**
+```sql
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255),
+    avatar_url VARCHAR(500),
+    email_verified_at TIMESTAMP,
+    two_factor_secret VARCHAR(255),
+    two_factor_enabled BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP
+);
+
+-- Indexes
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_deleted_at ON users(deleted_at);
+```
+
+#### **Teams Table**
+```sql
+CREATE TABLE teams (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) UNIQUE NOT NULL,
+    description TEXT,
+    avatar_url VARCHAR(500),
+    subscription_plan VARCHAR(50) DEFAULT 'free',
+    subscription_ends_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP
+);
+
+-- Indexes
+CREATE INDEX idx_teams_slug ON teams(slug);
+CREATE INDEX idx_teams_deleted_at ON teams(deleted_at);
+```
+
+#### **Team Members Table**
+```sql
+CREATE TABLE team_members (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role VARCHAR(50) NOT NULL DEFAULT 'member', -- owner, admin, member, viewer
+    permissions JSONB DEFAULT '{}',
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(team_id, user_id)
+);
+
+-- Indexes
+CREATE INDEX idx_team_members_team_id ON team_members(team_id);
+CREATE INDEX idx_team_members_user_id ON team_members(user_id);
+```
+
+#### **Servers Table**
+```sql
+CREATE TABLE servers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    ip_address INET NOT NULL,
+    port INTEGER DEFAULT 22,
+    username VARCHAR(255) NOT NULL,
+    ssh_key_id UUID REFERENCES ssh_keys(id),
+    status VARCHAR(50) DEFAULT 'unreachable', -- reachable, unreachable, installing
+    os_type VARCHAR(50), -- ubuntu, debian, centos, etc.
+    os_version VARCHAR(100),
+    docker_version VARCHAR(100),
+    cpu_count INTEGER,
+    memory_mb INTEGER,
+    disk_gb INTEGER,
+    last_ping_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP
+);
+
+-- Indexes
+CREATE INDEX idx_servers_team_id ON servers(team_id);
+CREATE INDEX idx_servers_status ON servers(status);
+CREATE INDEX idx_servers_deleted_at ON servers(deleted_at);
+```
+
+#### **Applications Table**
+```sql
+CREATE TABLE applications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    server_id UUID NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    repository_url VARCHAR(500),
+    repository_branch VARCHAR(255) DEFAULT 'main',
+    build_pack VARCHAR(100), -- dockerfile, static, php, node, python, etc.
+    port INTEGER,
+    domain VARCHAR(255),
+    ssl_enabled BOOLEAN DEFAULT FALSE,
+    ssl_certificate_id UUID,
+    environment_variables JSONB DEFAULT '{}',
+    deploy_script TEXT,
+    health_check_url VARCHAR(500),
+    health_check_method VARCHAR(10) DEFAULT 'GET',
+    status VARCHAR(50) DEFAULT 'stopped', -- running, stopped, deploying, failed
+    container_id VARCHAR(255),
+    last_deployment_id UUID,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP
+);
+
+-- Indexes
+CREATE INDEX idx_applications_team_id ON applications(team_id);
+CREATE INDEX idx_applications_server_id ON applications(server_id);
+CREATE INDEX idx_applications_status ON applications(status);
+CREATE INDEX idx_applications_domain ON applications(domain);
+CREATE INDEX idx_applications_deleted_at ON applications(deleted_at);
+```
+
+#### **Deployments Table**
+```sql
+CREATE TABLE deployments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    application_id UUID NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+    triggered_by UUID NOT NULL REFERENCES users(id),
+    git_commit_hash VARCHAR(255),
+    git_commit_message TEXT,
+    status VARCHAR(50) DEFAULT 'pending', -- pending, building, deploying, success, failed
+    build_logs TEXT,
+    deploy_logs TEXT,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMP,
+    duration_seconds INTEGER,
+    rollback_deployment_id UUID REFERENCES deployments(id)
+);
+
+-- Indexes
+CREATE INDEX idx_deployments_application_id ON deployments(application_id);
+CREATE INDEX idx_deployments_status ON deployments(status);
+CREATE INDEX idx_deployments_started_at ON deployments(started_at);
+```
+
+### **Data Model Relationships**
+```go
+// Go struct representations
+type User struct {
+    ID                UUID      `json:"id" gorm:"type:uuid;default:gen_random_uuid()"`
+    Email             string    `json:"email" gorm:"uniqueIndex;not null"`
+    Name              string    `json:"name" gorm:"not null"`
+    PasswordHash      string    `json:"-" gorm:"column:password_hash"`
+    AvatarURL         string    `json:"avatar_url"`
+    EmailVerifiedAt   *time.Time `json:"email_verified_at"`
+    TwoFactorSecret   string    `json:"-" gorm:"column:two_factor_secret"`
+    TwoFactorEnabled  bool      `json:"two_factor_enabled" gorm:"default:false"`
+    CreatedAt         time.Time `json:"created_at"`
+    UpdatedAt         time.Time `json:"updated_at"`
+    DeletedAt         *time.Time `json:"deleted_at" gorm:"index"`
+    
+    // Relationships
+    TeamMembers       []TeamMember `json:"team_members" gorm:"foreignKey:UserID"`
+    Teams             []Team       `json:"teams" gorm:"many2many:team_members"`
+}
+
+type Team struct {
+    ID                  UUID      `json:"id" gorm:"type:uuid;default:gen_random_uuid()"`
+    Name                string    `json:"name" gorm:"not null"`
+    Slug                string    `json:"slug" gorm:"uniqueIndex;not null"`
+    Description         string    `json:"description"`
+    AvatarURL           string    `json:"avatar_url"`
+    SubscriptionPlan    string    `json:"subscription_plan" gorm:"default:free"`
+    SubscriptionEndsAt  *time.Time `json:"subscription_ends_at"`
+    CreatedAt           time.Time `json:"created_at"`
+    UpdatedAt           time.Time `json:"updated_at"`
+    DeletedAt           *time.Time `json:"deleted_at" gorm:"index"`
+    
+    // Relationships
+    Members             []TeamMember   `json:"members" gorm:"foreignKey:TeamID"`
+    Servers             []Server       `json:"servers" gorm:"foreignKey:TeamID"`
+    Applications        []Application  `json:"applications" gorm:"foreignKey:TeamID"`
+}
+```
+
+---
+
+## 🔌 API Specifications
+
+### **Current Endpoints (v1.4.0)**
+
+#### **Health Check API**
+```go
+// GET /health
+type HealthResponse struct {
+    Status    string    `json:"status"`     // "healthy" | "unhealthy"
+    Version   string    `json:"version"`    // "v1.4.0"
+    BuildTime string    `json:"buildTime"`  // "2025-06-21T15:47:00Z"
+    Commit    string    `json:"commit"`     // "azure-registry-v1.4.0"
+    Timestamp time.Time `json:"timestamp"`  // Current server time
+    Database  string    `json:"database"`   // "connected" | "disconnected"
+}
+
+// Response Codes:
+// 200 - Service healthy
+// 503 - Service unhealthy (database down, etc.)
+
+// Example Response:
+{
+    "status": "healthy",
+    "version": "v1.4.0",
+    "buildTime": "2025-06-21T15:47:00Z",
+    "commit": "azure-registry-v1.4.0",
+    "timestamp": "2025-06-21T15:47:30.123Z",
+    "database": "connected"
+}
+```
+
+#### **Version Information API**
+```go
+// GET /version
+type VersionResponse struct {
+    Version   string `json:"version"`
+    BuildTime string `json:"buildTime"`
+    Commit    string `json:"commit"`
+}
+
+// Response Codes:
+// 200 - Success
+
+// Example Response:
+{
+    "version": "v1.4.0",
+    "buildTime": "2025-06-21T15:47:00Z",
+    "commit": "azure-registry-v1.4.0"
+}
+```
+
+### **Future API Endpoints (Planned)**
+
+#### **Authentication API**
+```go
+// POST /api/auth/login
+type LoginRequest struct {
+    Email    string `json:"email" binding:"required,email"`
+    Password string `json:"password" binding:"required,min=8"`
+}
+
+type LoginResponse struct {
+    User         User   `json:"user"`
+    AccessToken  string `json:"access_token"`
+    RefreshToken string `json:"refresh_token"`
+    ExpiresIn    int    `json:"expires_in"` // seconds
+}
+
+// POST /api/auth/register
+type RegisterRequest struct {
+    Email           string `json:"email" binding:"required,email"`
+    Name            string `json:"name" binding:"required,min=2"`
+    Password        string `json:"password" binding:"required,min=8"`
+    PasswordConfirm string `json:"password_confirm" binding:"required"`
+}
+
+// POST /api/auth/logout
+// Requires: Authorization header
+
+// POST /api/auth/refresh
+type RefreshRequest struct {
+    RefreshToken string `json:"refresh_token" binding:"required"`
+}
+```
+
+#### **Teams API**
+```go
+// GET /api/teams
+type TeamsListResponse struct {
+    Teams []Team `json:"teams"`
+    Total int    `json:"total"`
+}
+
+// POST /api/teams
+type CreateTeamRequest struct {
+    Name        string `json:"name" binding:"required,min=2,max=100"`
+    Slug        string `json:"slug" binding:"required,min=2,max=50,alphanum"`
+    Description string `json:"description" binding:"max=500"`
+}
+
+// GET /api/teams/{teamId}
+// PUT /api/teams/{teamId}
+// DELETE /api/teams/{teamId}
+
+// GET /api/teams/{teamId}/members
+// POST /api/teams/{teamId}/members
+type AddMemberRequest struct {
+    Email string `json:"email" binding:"required,email"`
+    Role  string `json:"role" binding:"required,oneof=owner admin member viewer"`
+}
+
+// PUT /api/teams/{teamId}/members/{userId}
+// DELETE /api/teams/{teamId}/members/{userId}
+```
+
+#### **Servers API**
+```go
+// GET /api/teams/{teamId}/servers
+type ServersListResponse struct {
+    Servers []Server `json:"servers"`
+    Total   int      `json:"total"`
+}
+
+// POST /api/teams/{teamId}/servers
+type CreateServerRequest struct {
+    Name        string `json:"name" binding:"required,min=2,max=100"`
+    Description string `json:"description" binding:"max=500"`
+    IPAddress   string `json:"ip_address" binding:"required,ip"`
+    Port        int    `json:"port" binding:"min=1,max=65535"`
+    Username    string `json:"username" binding:"required"`
+    SSHKeyID    UUID   `json:"ssh_key_id" binding:"required"`
+}
+
+// GET /api/teams/{teamId}/servers/{serverId}
+// PUT /api/teams/{teamId}/servers/{serverId}
+// DELETE /api/teams/{teamId}/servers/{serverId}
+
+// POST /api/teams/{teamId}/servers/{serverId}/test-connection
+type TestConnectionResponse struct {
+    Success    bool              `json:"success"`
+    Status     string            `json:"status"`
+    SystemInfo ServerSystemInfo `json:"system_info,omitempty"`
+    Error      string            `json:"error,omitempty"`
+}
+
+type ServerSystemInfo struct {
+    OSType        string `json:"os_type"`
+    OSVersion     string `json:"os_version"`
+    DockerVersion string `json:"docker_version"`
+    CPUCount      int    `json:"cpu_count"`
+    MemoryMB      int    `json:"memory_mb"`
+    DiskGB        int    `json:"disk_gb"`
+}
+```
+
+#### **Applications API**
+```go
+// GET /api/teams/{teamId}/applications
+type ApplicationsListResponse struct {
+    Applications []Application `json:"applications"`
+    Total        int           `json:"total"`
+}
+
+// POST /api/teams/{teamId}/applications
+type CreateApplicationRequest struct {
+    Name              string            `json:"name" binding:"required,min=2,max=100"`
+    Description       string            `json:"description" binding:"max=500"`
+    ServerID          UUID              `json:"server_id" binding:"required"`
+    RepositoryURL     string            `json:"repository_url" binding:"required,url"`
+    RepositoryBranch  string            `json:"repository_branch" binding:"required"`
+    BuildPack         string            `json:"build_pack" binding:"required"`
+    Port              int               `json:"port" binding:"min=1,max=65535"`
+    Domain            string            `json:"domain"`
+    EnvironmentVars   map[string]string `json:"environment_variables"`
+}
+
+// GET /api/teams/{teamId}/applications/{appId}
+// PUT /api/teams/{teamId}/applications/{appId}
+// DELETE /api/teams/{teamId}/applications/{appId}
+
+// POST /api/teams/{teamId}/applications/{appId}/deploy
+type DeployRequest struct {
+    Force bool `json:"force"` // Force rebuild
+}
+
+// GET /api/teams/{teamId}/applications/{appId}/deployments
+type DeploymentsListResponse struct {
+    Deployments []Deployment `json:"deployments"`
+    Total       int          `json:"total"`
+}
+
+// GET /api/teams/{teamId}/applications/{appId}/logs
+type LogsResponse struct {
+    Logs      []LogEntry `json:"logs"`
+    Timestamp time.Time  `json:"timestamp"`
+}
+
+type LogEntry struct {
+    Timestamp time.Time `json:"timestamp"`
+    Level     string    `json:"level"`
+    Message   string    `json:"message"`
+    Source    string    `json:"source"` // application, deployment, system
+}
+```
+
+---
+
+## 🔐 Authentication & Authorization
+
+### **Authentication Methods**
+
+#### **JWT Token Authentication**
+```go
+type JWTClaims struct {
+    UserID   UUID   `json:"user_id"`
+    Email    string `json:"email"`
+    TeamIDs  []UUID `json:"team_ids"`
+    Role     string `json:"role"`
+    jwt.StandardClaims
+}
+
+// Token Configuration
+const (
+    AccessTokenExpiry  = 24 * time.Hour
+    RefreshTokenExpiry = 30 * 24 * time.Hour
+    JWTSigningMethod   = "HS256"
+)
+```
+
+#### **Session Management**
+```go
+type Session struct {
+    ID           string    `json:"id"`
+    UserID       UUID      `json:"user_id"`
+    AccessToken  string    `json:"access_token"`
+    RefreshToken string    `json:"refresh_token"`
+    UserAgent    string    `json:"user_agent"`
+    IPAddress    string    `json:"ip_address"`
+    ExpiresAt    time.Time `json:"expires_at"`
+    CreatedAt    time.Time `json:"created_at"`
+    LastUsedAt   time.Time `json:"last_used_at"`
+}
+```
+
+### **Role-Based Access Control (RBAC)**
+
+#### **Team Roles and Permissions**
+```go
+type Role string
+
+const (
+    RoleOwner  Role = "owner"   // Full access including team deletion
+    RoleAdmin  Role = "admin"   // Manage members, servers, applications
+    RoleMember Role = "member"  // Deploy applications, view resources
+    RoleViewer Role = "viewer"  // Read-only access
+)
+
+type Permission string
+
+const (
+    // Team permissions
+    PermTeamRead   Permission = "team:read"
+    PermTeamUpdate Permission = "team:update"
+    PermTeamDelete Permission = "team:delete"
+    
+    // Member permissions
+    PermMemberInvite Permission = "member:invite"
+    PermMemberRemove Permission = "member:remove"
+    PermMemberUpdate Permission = "member:update"
+    
+    // Server permissions
+    PermServerCreate Permission = "server:create"
+    PermServerRead   Permission = "server:read"
+    PermServerUpdate Permission = "server:update"
+    PermServerDelete Permission = "server:delete"
+    
+    // Application permissions
+    PermAppCreate Permission = "application:create"
+    PermAppRead   Permission = "application:read"
+    PermAppUpdate Permission = "application:update"
+    PermAppDelete Permission = "application:delete"
+    PermAppDeploy Permission = "application:deploy"
+    
+    // Deployment permissions
+    PermDeploymentRead Permission = "deployment:read"
+    PermDeploymentStop Permission = "deployment:stop"
+)
+
+// Role-Permission Matrix
+var RolePermissions = map[Role][]Permission{
+    RoleOwner: {
+        PermTeamRead, PermTeamUpdate, PermTeamDelete,
+        PermMemberInvite, PermMemberRemove, PermMemberUpdate,
+        PermServerCreate, PermServerRead, PermServerUpdate, PermServerDelete,
+        PermAppCreate, PermAppRead, PermAppUpdate, PermAppDelete, PermAppDeploy,
+        PermDeploymentRead, PermDeploymentStop,
+    },
+    RoleAdmin: {
+        PermTeamRead, PermTeamUpdate,
+        PermMemberInvite, PermMemberRemove, PermMemberUpdate,
+        PermServerCreate, PermServerRead, PermServerUpdate, PermServerDelete,
+        PermAppCreate, PermAppRead, PermAppUpdate, PermAppDelete, PermAppDeploy,
+        PermDeploymentRead, PermDeploymentStop,
+    },
+    RoleMember: {
+        PermTeamRead,
+        PermServerRead,
+        PermAppCreate, PermAppRead, PermAppUpdate, PermAppDeploy,
+        PermDeploymentRead,
+    },
+    RoleViewer: {
+        PermTeamRead,
+        PermServerRead,
+        PermAppRead,
+        PermDeploymentRead,
+    },
+}
+```
+
+---
+
+## 🐳 Docker Integration Requirements
+
+### **Docker Client Interface**
+```go
+type DockerService interface {
+    // Container Management
+    CreateContainer(ctx context.Context, config ContainerConfig) (*Container, error)
+    StartContainer(ctx context.Context, containerID string) error
+    StopContainer(ctx context.Context, containerID string) error
+    RemoveContainer(ctx context.Context, containerID string) error
+    GetContainer(ctx context.Context, containerID string) (*Container, error)
+    ListContainers(ctx context.Context, filters map[string]string) ([]*Container, error)
+    
+    // Image Management
+    BuildImage(ctx context.Context, buildContext io.Reader, options BuildOptions) (*BuildResult, error)
+    PullImage(ctx context.Context, imageName string) error
+    RemoveImage(ctx context.Context, imageID string) error
+    ListImages(ctx context.Context) ([]*Image, error)
+    
+    // Network Management
+    CreateNetwork(ctx context.Context, name string, options NetworkOptions) (*Network, error)
+    RemoveNetwork(ctx context.Context, networkID string) error
+    ConnectNetwork(ctx context.Context, networkID, containerID string) error
+    
+    // Volume Management
+    CreateVolume(ctx context.Context, name string, options VolumeOptions) (*Volume, error)
+    RemoveVolume(ctx context.Context, volumeID string) error
+    
+    // Monitoring
+    GetContainerLogs(ctx context.Context, containerID string, options LogOptions) (io.ReadCloser, error)
+    GetContainerStats(ctx context.Context, containerID string) (*Stats, error)
+}
+
+type ContainerConfig struct {
+    Image           string            `json:"image"`
+    Name            string            `json:"name"`
+    Command         []string          `json:"command,omitempty"`
+    Environment     map[string]string `json:"environment,omitempty"`
+    Ports           []PortMapping     `json:"ports,omitempty"`
+    Volumes         []VolumeMount     `json:"volumes,omitempty"`
+    Networks        []string          `json:"networks,omitempty"`
+    RestartPolicy   string            `json:"restart_policy"`
+    HealthCheck     *HealthCheck      `json:"health_check,omitempty"`
+    Labels          map[string]string `json:"labels,omitempty"`
+}
+
+type PortMapping struct {
+    HostPort      int    `json:"host_port"`
+    ContainerPort int    `json:"container_port"`
+    Protocol      string `json:"protocol"` // tcp, udp
+}
+
+type VolumeMount struct {
+    Source      string `json:"source"`
+    Destination string `json:"destination"`
+    ReadOnly    bool   `json:"read_only"`
+}
+
+type HealthCheck struct {
+    Command     []string      `json:"command"`
+    Interval    time.Duration `json:"interval"`
+    Timeout     time.Duration `json:"timeout"`
+    StartPeriod time.Duration `json:"start_period"`
+    Retries     int           `json:"retries"`
+}
+```
+
+### **Application Deployment Workflow**
+```go
+type DeploymentEngine interface {
+    // Deploy application from Git repository
+    DeployFromGit(ctx context.Context, request DeploymentRequest) (*Deployment, error)
+    
+    // Get deployment status
+    GetDeploymentStatus(ctx context.Context, deploymentID UUID) (*DeploymentStatus, error)
+    
+    // Cancel ongoing deployment
+    CancelDeployment(ctx context.Context, deploymentID UUID) error
+    
+    // Rollback to previous deployment
+    RollbackDeployment(ctx context.Context, applicationID UUID, targetDeploymentID UUID) error
+}
+
+type DeploymentRequest struct {
+    ApplicationID     UUID              `json:"application_id"`
+    TriggeredBy       UUID              `json:"triggered_by"`
+    GitCommitHash     string            `json:"git_commit_hash,omitempty"`
+    EnvironmentVars   map[string]string `json:"environment_vars,omitempty"`
+    Force             bool              `json:"force"`
+}
+
+type DeploymentStatus struct {
+    ID          UUID                    `json:"id"`
+    Status      DeploymentStatusType    `json:"status"`
+    Progress    int                     `json:"progress"` // 0-100
+    Logs        []string                `json:"logs"`
+    StartedAt   time.Time               `json:"started_at"`
+    FinishedAt  *time.Time              `json:"finished_at,omitempty"`
+    Error       string                  `json:"error,omitempty"`
+}
+
+type DeploymentStatusType string
+
+const (
+    DeploymentPending   DeploymentStatusType = "pending"
+    DeploymentCloning   DeploymentStatusType = "cloning"
+    DeploymentBuilding  DeploymentStatusType = "building"
+    DeploymentDeploying DeploymentStatusType = "deploying"
+    DeploymentSuccess   DeploymentStatusType = "success"
+    DeploymentFailed    DeploymentStatusType = "failed"
+    DeploymentCancelled DeploymentStatusType = "cancelled"
+)
+```
+
+---
+
+## 🔗 Git Integration Requirements
+
+### **Git Repository Service**
+```go
+type GitService interface {
+    // Repository operations
+    CloneRepository(ctx context.Context, url, branch, destination string, auth GitAuth) error
+    PullRepository(ctx context.Context, repoPath, branch string, auth GitAuth) error
+    GetLatestCommit(ctx context.Context, repoPath, branch string) (*GitCommit, error)
+    GetCommitHistory(ctx context.Context, repoPath string, limit int) ([]*GitCommit, error)
+    
+    // Branch operations
+    ListBranches(ctx context.Context, repoPath string) ([]string, error)
+    GetDefaultBranch(ctx context.Context, repoURL string, auth GitAuth) (string, error)
+    
+    // Webhook operations
+    ValidateWebhookSignature(payload []byte, signature, secret string) bool
+    ParseWebhookPayload(payload []byte, provider GitProvider) (*WebhookPayload, error)
+}
+
+type GitAuth struct {
+    Type     GitAuthType `json:"type"`
+    Username string      `json:"username,omitempty"`
+    Password string      `json:"password,omitempty"`
+    Token    string      `json:"token,omitempty"`
+    SSHKey   string      `json:"ssh_key,omitempty"`
+}
+
+type GitAuthType string
+
+const (
+    GitAuthNone     GitAuthType = "none"
+    GitAuthBasic    GitAuthType = "basic"
+    GitAuthToken    GitAuthType = "token"
+    GitAuthSSH      GitAuthType = "ssh"
+)
+
+type GitCommit struct {
+    Hash      string    `json:"hash"`
+    Message   string    `json:"message"`
+    Author    string    `json:"author"`
+    Email     string    `json:"email"`
+    Timestamp time.Time `json:"timestamp"`
+}
+
+type GitProvider string
+
+const (
+    GitProviderGitHub GitProvider = "github"
+    GitProviderGitLab GitProvider = "gitlab"
+    GitProviderBitbucket GitProvider = "bitbucket"
+    GitProviderGeneric GitProvider = "generic"
+)
+
+type WebhookPayload struct {
+    Provider     GitProvider `json:"provider"`
+    Repository   string      `json:"repository"`
+    Branch       string      `json:"branch"`
+    Commit       GitCommit   `json:"commit"`
+    EventType    string      `json:"event_type"` // push, pull_request, etc.
+}
+```
+
+---
+
+## 🔒 SSH Management Requirements
+
+### **SSH Connection Service**
+```go
+type SSHService interface {
+    // Connection management
+    Connect(ctx context.Context, config SSHConfig) (*SSHConnection, error)
+    Disconnect(conn *SSHConnection) error
+    TestConnection(ctx context.Context, config SSHConfig) error
+    
+    // Command execution
+    ExecuteCommand(ctx context.Context, conn *SSHConnection, command string) (*CommandResult, error)
+    ExecuteScript(ctx context.Context, conn *SSHConnection, script string) (*CommandResult, error)
+    
+    // File operations
+    UploadFile(ctx context.Context, conn *SSHConnection, localPath, remotePath string) error
+    DownloadFile(ctx context.Context, conn *SSHConnection, remotePath, localPath string) error
+    CreateDirectory(ctx context.Context, conn *SSHConnection, path string) error
+    
+    // System information
+    GetSystemInfo(ctx context.Context, conn *SSHConnection) (*SystemInfo, error)
+    GetDockerInfo(ctx context.Context, conn *SSHConnection) (*DockerInfo, error)
+}
+
+type SSHConfig struct {
+    Host       string        `json:"host"`
+    Port       int           `json:"port"`
+    Username   string        `json:"username"`
+    Password   string        `json:"password,omitempty"`
+    PrivateKey string        `json:"private_key,omitempty"`
+    Timeout    time.Duration `json:"timeout"`
+}
+
+type SSHConnection struct {
+    ID       string          `json:"id"`
+    Client   *ssh.Client     `json:"-"`
+    Config   SSHConfig       `json:"config"`
+    ConnectedAt time.Time    `json:"connected_at"`
+}
+
+type CommandResult struct {
+    Command    string        `json:"command"`
+    ExitCode   int           `json:"exit_code"`
+    Stdout     string        `json:"stdout"`
+    Stderr     string        `json:"stderr"`
+    Duration   time.Duration `json:"duration"`
+    ExecutedAt time.Time     `json:"executed_at"`
+}
+
+type SystemInfo struct {
+    OSType        string  `json:"os_type"`
+    OSVersion     string  `json:"os_version"`
+    Kernel        string  `json:"kernel"`
+    Architecture  string  `json:"architecture"`
+    CPUCount      int     `json:"cpu_count"`
+    MemoryMB      int     `json:"memory_mb"`
+    DiskGB        int     `json:"disk_gb"`
+    LoadAverage   float64 `json:"load_average"`
+    Uptime        int     `json:"uptime_seconds"`
+}
+
+type DockerInfo struct {
+    Version       string `json:"version"`
+    APIVersion    string `json:"api_version"`
+    Containers    int    `json:"containers"`
+    Images        int    `json:"images"`
+    StorageDriver string `json:"storage_driver"`
+    LoggingDriver string `json:"logging_driver"`
+}
+```
+
+---
+
+## 🌐 Real-Time Communication
+
+### **WebSocket Implementation**
+```go
+type WebSocketService interface {
+    // Connection management
+    HandleConnection(w http.ResponseWriter, r *http.Request) error
+    CloseConnection(connectionID string) error
+    
+    // Broadcasting
+    BroadcastToUser(userID UUID, message WSMessage) error
+    BroadcastToTeam(teamID UUID, message WSMessage) error
+    BroadcastToApplication(appID UUID, message WSMessage) error
+    
+    // Subscriptions
+    SubscribeToLogs(connectionID string, applicationID UUID) error
+    SubscribeToDeployments(connectionID string, applicationID UUID) error
+    UnsubscribeAll(connectionID string) error
+}
+
+type WSMessage struct {
+    Type      WSMessageType `json:"type"`
+    Timestamp time.Time     `json:"timestamp"`
+    Data      interface{}   `json:"data"`
+}
+
+type WSMessageType string
+
+const (
+    WSMsgLogEntry         WSMessageType = "log_entry"
+    WSMsgDeploymentStatus WSMessageType = "deployment_status"
+    WSMsgApplicationStatus WSMessageType = "application_status"
+    WSMsgServerStatus     WSMessageType = "server_status"
+    WSMsgNotification     WSMessageType = "notification"
+)
+
+// WebSocket message examples
+type LogEntryMessage struct {
+    ApplicationID UUID      `json:"application_id"`
+    Timestamp     time.Time `json:"timestamp"`
+    Level         string    `json:"level"`
+    Message       string    `json:"message"`
+    Source        string    `json:"source"`
+}
+
+type DeploymentStatusMessage struct {
+    DeploymentID UUID                 `json:"deployment_id"`
+    Status       DeploymentStatusType `json:"status"`
+    Progress     int                  `json:"progress"`
+    Log          string               `json:"log,omitempty"`
+}
+```
+
+---
+
+## 📊 Monitoring & Logging
+
+### **Application Monitoring**
+```go
+type MonitoringService interface {
+    // Health checks
+    PerformHealthCheck(ctx context.Context, applicationID UUID) (*HealthCheckResult, error)
+    GetHealthHistory(ctx context.Context, applicationID UUID, period time.Duration) ([]*HealthCheckResult, error)
+    
+    // Metrics collection
+    CollectMetrics(ctx context.Context, applicationID UUID) (*ApplicationMetrics, error)
+    GetMetricsHistory(ctx context.Context, applicationID UUID, period time.Duration) ([]*ApplicationMetrics, error)
+    
+    // Alerting
+    CreateAlert(ctx context.Context, alert Alert) error
+    GetActiveAlerts(ctx context.Context, applicationID UUID) ([]*Alert, error)
+    ResolveAlert(ctx context.Context, alertID UUID) error
+}
+
+type HealthCheckResult struct {
+    ApplicationID UUID      `json:"application_id"`
+    Timestamp     time.Time `json:"timestamp"`
+    Status        string    `json:"status"` // healthy, unhealthy, unknown
+    ResponseTime  int       `json:"response_time_ms"`
+    StatusCode    int       `json:"status_code,omitempty"`
+    Error         string    `json:"error,omitempty"`
+}
+
+type ApplicationMetrics struct {
+    ApplicationID   UUID      `json:"application_id"`
+    Timestamp       time.Time `json:"timestamp"`
+    CPUUsage        float64   `json:"cpu_usage_percent"`
+    MemoryUsage     int       `json:"memory_usage_mb"`
+    MemoryLimit     int       `json:"memory_limit_mb"`
+    NetworkRx       int       `json:"network_rx_bytes"`
+    NetworkTx       int       `json:"network_tx_bytes"`
+    DiskUsage       int       `json:"disk_usage_mb"`
+    ResponseTime    int       `json:"response_time_ms"`
+    RequestCount    int       `json:"request_count"`
+    ErrorRate       float64   `json:"error_rate_percent"`
+}
+
+type Alert struct {
+    ID            UUID      `json:"id"`
+    ApplicationID UUID      `json:"application_id"`
+    Type          AlertType `json:"type"`
+    Severity      string    `json:"severity"` // low, medium, high, critical
+    Title         string    `json:"title"`
+    Description   string    `json:"description"`
+    Threshold     float64   `json:"threshold,omitempty"`
+    Value         float64   `json:"value,omitempty"`
+    CreatedAt     time.Time `json:"created_at"`
+    ResolvedAt    *time.Time `json:"resolved_at,omitempty"`
+}
+
+type AlertType string
+
+const (
+    AlertCPUHigh       AlertType = "cpu_high"
+    AlertMemoryHigh    AlertType = "memory_high"
+    AlertDiskFull      AlertType = "disk_full"
+    AlertHealthCheck   AlertType = "health_check_failed"
+    AlertResponseTime  AlertType = "response_time_high"
+    AlertErrorRate     AlertType = "error_rate_high"
+    AlertDeployment    AlertType = "deployment_failed"
+)
+```
+
+### **Centralized Logging**
+```go
+type LoggingService interface {
+    // Log ingestion
+    IngestLogs(ctx context.Context, applicationID UUID, logs []LogEntry) error
+    StreamLogs(ctx context.Context, applicationID UUID, since time.Time) (<-chan LogEntry, error)
+    
+    // Log retrieval
+    GetLogs(ctx context.Context, applicationID UUID, filter LogFilter) (*LogResult, error)
+    SearchLogs(ctx context.Context, applicationID UUID, query string, filter LogFilter) (*LogResult, error)
+    
+    // Log management
+    RotateLogs(ctx context.Context, applicationID UUID) error
+    DeleteOldLogs(ctx context.Context, olderThan time.Duration) error
+}
+
+type LogFilter struct {
+    Since    *time.Time `json:"since,omitempty"`
+    Until    *time.Time `json:"until,omitempty"`
+    Level    string     `json:"level,omitempty"`
+    Source   string     `json:"source,omitempty"`
+    Limit    int        `json:"limit,omitempty"`
+    Offset   int        `json:"offset,omitempty"`
+}
+
+type LogResult struct {
+    Logs       []LogEntry `json:"logs"`
+    Total      int        `json:"total"`
+    HasMore    bool       `json:"has_more"`
+    NextOffset int        `json:"next_offset,omitempty"`
+}
+```
+
+---
+
+## 🚦 Error Handling & Validation
+
+### **Error Response Format**
+```go
+type ErrorResponse struct {
+    Error   ErrorDetail   `json:"error"`
+    TraceID string        `json:"trace_id,omitempty"`
+}
+
+type ErrorDetail struct {
+    Code    string                 `json:"code"`
+    Message string                 `json:"message"`
+    Details map[string]interface{} `json:"details,omitempty"`
+}
+
+// Standard error codes
+const (
+    ErrCodeBadRequest          = "BAD_REQUEST"
+    ErrCodeUnauthorized        = "UNAUTHORIZED"
+    ErrCodeForbidden           = "FORBIDDEN"
+    ErrCodeNotFound            = "NOT_FOUND"
+    ErrCodeConflict            = "CONFLICT"
+    ErrCodeValidationFailed    = "VALIDATION_FAILED"
+    ErrCodeInternalServerError = "INTERNAL_SERVER_ERROR"
+    ErrCodeServiceUnavailable  = "SERVICE_UNAVAILABLE"
+    
+    // Business logic errors
+    ErrCodeDeploymentFailed    = "DEPLOYMENT_FAILED"
+    ErrCodeServerUnreachable   = "SERVER_UNREACHABLE"
+    ErrCodeInvalidCredentials  = "INVALID_CREDENTIALS"
+    ErrCodeQuotaExceeded       = "QUOTA_EXCEEDED"
+)
+
+// Example error responses
+{
+    "error": {
+        "code": "VALIDATION_FAILED",
+        "message": "Request validation failed",
+        "details": {
+            "fields": {
+                "email": ["Email is required"],
+                "password": ["Password must be at least 8 characters"]
+            }
+        }
+    },
+    "trace_id": "req_123456789"
+}
+```
+
+### **Input Validation**
+```go
+type Validator interface {
+    ValidateStruct(s interface{}) error
+    ValidateField(field interface{}, tag string) error
+}
+
+// Custom validation tags
+const (
+    TagUUID        = "uuid"
+    TagSlug        = "slug"
+    TagDomainName  = "domain"
+    TagIPAddress   = "ip"
+    TagPortNumber  = "port"
+    TagGitURL      = "git_url"
+    TagDockerImage = "docker_image"
+)
+
+// Validation examples
+type CreateApplicationRequest struct {
+    Name             string `json:"name" binding:"required,min=2,max=100,slug"`
+    RepositoryURL    string `json:"repository_url" binding:"required,git_url"`
+    Port             int    `json:"port" binding:"required,port"`
+    Domain           string `json:"domain" binding:"omitempty,domain"`
+    EnvironmentVars  map[string]string `json:"environment_variables" binding:"dive,max=1000"`
+}
+```
+
+---
+
+## 📈 Performance Requirements
+
+### **Response Time Requirements**
+| Endpoint Category | Target Response Time | Maximum Response Time |
+|-------------------|---------------------|----------------------|
+| **Health Checks** | < 50ms | < 100ms |
+| **Authentication** | < 200ms | < 500ms |
+| **CRUD Operations** | < 300ms | < 1000ms |
+| **Deployment Triggers** | < 500ms | < 2000ms |
+| **Log Retrieval** | < 1000ms | < 3000ms |
+| **File Downloads** | Streaming | N/A |
+
+### **Concurrency Requirements**
+```go
+// Server Configuration
+const (
+    MaxConcurrentDeployments = 10
+    MaxConcurrentSSHConnections = 50
+    MaxWebSocketConnections = 1000
+    MaxAPIRequestsPerSecond = 100
+    DatabaseConnectionPoolSize = 20
+    RedisConnectionPoolSize = 10
+)
+
+// Rate Limiting Configuration
+type RateLimitConfig struct {
+    RequestsPerMinute int           `json:"requests_per_minute"`
+    BurstSize         int           `json:"burst_size"`
+    WindowSize        time.Duration `json:"window_size"`
+}
+
+var DefaultRateLimits = map[string]RateLimitConfig{
+    "authentication": {RequestsPerMinute: 10, BurstSize: 5, WindowSize: time.Minute},
+    "api_calls":      {RequestsPerMinute: 60, BurstSize: 10, WindowSize: time.Minute},
+    "deployments":    {RequestsPerMinute: 5, BurstSize: 2, WindowSize: time.Minute},
+}
+```
+
+### **Resource Limits**
+```go
+type ResourceLimits struct {
+    MaxApplicationsPerTeam    int `json:"max_applications_per_team"`
+    MaxServersPerTeam         int `json:"max_servers_per_team"`
+    MaxDeploymentsPerHour     int `json:"max_deployments_per_hour"`
+    MaxLogRetentionDays       int `json:"max_log_retention_days"`
+    MaxUploadFileSizeMB       int `json:"max_upload_file_size_mb"`
+    MaxEnvironmentVariables   int `json:"max_environment_variables"`
+}
+
+var DefaultLimits = ResourceLimits{
+    MaxApplicationsPerTeam:  25,
+    MaxServersPerTeam:       10,
+    MaxDeploymentsPerHour:   20,
+    MaxLogRetentionDays:     30,
+    MaxUploadFileSizeMB:     100,
+    MaxEnvironmentVariables: 50,
+}
+```
+
+---
+
+## 🧪 Testing Requirements
+
+### **Unit Testing Coverage**
+```go
+// Minimum test coverage requirements
+const (
+    MinimumCoveragePercent = 80
+    CriticalPathCoverage   = 95  // Authentication, deployment, billing
+    BusinessLogicCoverage  = 90  // Core business operations
+    UtilityFunctionCoverage = 70 // Helper functions, utilities
+)
+
+// Test categories
+type TestCategory string
+
+const (
+    TestCategoryUnit        TestCategory = "unit"
+    TestCategoryIntegration TestCategory = "integration"
+    TestCategoryE2E         TestCategory = "e2e"
+    TestCategoryPerformance TestCategory = "performance"
+    TestCategorySecurity    TestCategory = "security"
+)
+```
+
+### **Integration Testing**
+```go
+// Database integration tests
+func TestDatabaseOperations(t *testing.T) {
+    // Test all CRUD operations for each model
+    // Test transaction handling
+    // Test concurrent access
+    // Test connection pooling
+}
+
+// API integration tests
+func TestAPIEndpoints(t *testing.T) {
+    // Test all HTTP endpoints
+    // Test authentication flows
+    // Test error responses
+    // Test rate limiting
+}
+
+// Docker integration tests
+func TestDockerOperations(t *testing.T) {
+    // Test container lifecycle
+    // Test image building
+    // Test network operations
+    // Test volume management
+}
+```
+
+### **End-to-End Testing Scenarios**
+```go
+// E2E test scenarios
+var E2EScenarios = []TestScenario{
+    {
+        Name: "Complete Application Deployment Flow",
+        Steps: []string{
+            "User registers and logs in",
+            "User creates a team",
+            "User adds a server",
+            "User creates an application",
+            "User triggers deployment",
+            "System deploys application successfully",
+            "User verifies application is accessible",
+        },
+    },
+    {
+        Name: "Multi-User Team Collaboration",
+        Steps: []string{
+            "Owner creates team and invites members",
+            "Members accept invitations",
+            "Multiple members deploy applications",
+            "Owner manages permissions",
+            "Verify proper access control",
+        },
+    },
+    {
+        Name: "Disaster Recovery",
+        Steps: []string{
+            "System running normally",
+            "Simulate database failure",
+            "Verify graceful degradation",
+            "Restore database",
+            "Verify full functionality restored",
+        },
+    },
+}
+```
+
+---
+
+## 🔒 Security Requirements
+
+### **Security Controls**
+```go
+type SecurityConfig struct {
+    // Password policy
+    MinPasswordLength    int  `json:"min_password_length"`
+    RequireUppercase     bool `json:"require_uppercase"`
+    RequireLowercase     bool `json:"require_lowercase"`
+    RequireNumbers       bool `json:"require_numbers"`
+    RequireSymbols       bool `json:"require_symbols"`
+    PasswordExpiryDays   int  `json:"password_expiry_days"`
+    
+    // Session security
+    SessionTimeoutMinutes    int  `json:"session_timeout_minutes"`
+    MaxConcurrentSessions    int  `json:"max_concurrent_sessions"`
+    RequireSessionReauth     bool `json:"require_session_reauth"`
+    
+    // API security
+    RequireAPIKeyForPublic   bool `json:"require_api_key_for_public"`
+    MaxAPIRequestsPerHour    int  `json:"max_api_requests_per_hour"`
+    EnableRequestLogging     bool `json:"enable_request_logging"`
+    
+    // Infrastructure security
+    AllowedIPRanges         []string `json:"allowed_ip_ranges"`
+    RequireSSHKeyAuth       bool     `json:"require_ssh_key_auth"`
+    EnableDockerSecurity    bool     `json:"enable_docker_security"`
+}
+
+var ProductionSecurityConfig = SecurityConfig{
+    MinPasswordLength:        12,
+    RequireUppercase:         true,
+    RequireLowercase:         true,
+    RequireNumbers:          true,
+    RequireSymbols:          true,
+    PasswordExpiryDays:      90,
+    SessionTimeoutMinutes:   60,
+    MaxConcurrentSessions:   5,
+    RequireSessionReauth:    true,
+    RequireAPIKeyForPublic:  true,
+    MaxAPIRequestsPerHour:   1000,
+    EnableRequestLogging:    true,
+    RequireSSHKeyAuth:      true,
+    EnableDockerSecurity:   true,
+}
+```
+
+### **Audit Logging**
+```go
+type AuditLog struct {
+    ID          UUID                   `json:"id"`
+    UserID      UUID                   `json:"user_id"`
+    TeamID      UUID                   `json:"team_id,omitempty"`
+    Action      string                 `json:"action"`
+    Resource    string                 `json:"resource"`
+    ResourceID  UUID                   `json:"resource_id,omitempty"`
+    Details     map[string]interface{} `json:"details"`
+    IPAddress   string                 `json:"ip_address"`
+    UserAgent   string                 `json:"user_agent"`
+    Timestamp   time.Time              `json:"timestamp"`
+    Success     bool                   `json:"success"`
+    ErrorMsg    string                 `json:"error_message,omitempty"`
+}
+
+// Auditable actions
+const (
+    ActionUserLogin          = "user.login"
+    ActionUserLogout         = "user.logout"
+    ActionUserCreate         = "user.create"
+    ActionUserUpdate         = "user.update"
+    ActionUserDelete         = "user.delete"
+    ActionTeamCreate         = "team.create"
+    ActionTeamUpdate         = "team.update"
+    ActionTeamDelete         = "team.delete"
+    ActionMemberInvite       = "member.invite"
+    ActionMemberRemove       = "member.remove"
+    ActionServerCreate       = "server.create"
+    ActionServerUpdate       = "server.update"
+    ActionServerDelete       = "server.delete"
+    ActionApplicationCreate  = "application.create"
+    ActionApplicationUpdate  = "application.update"
+    ActionApplicationDelete  = "application.delete"
+    ActionApplicationDeploy  = "application.deploy"
+    ActionDeploymentStart    = "deployment.start"
+    ActionDeploymentComplete = "deployment.complete"
+    ActionDeploymentFail     = "deployment.fail"
+)
+```
+
+---
+
+## 📋 Configuration Management
+
+### **Environment Configuration**
+```go
+type Config struct {
+    // Server configuration
+    Server ServerConfig `json:"server"`
+    
+    // Database configuration
+    Database DatabaseConfig `json:"database"`
+    
+    // Redis configuration
+    Redis RedisConfig `json:"redis"`
+    
+    // Authentication configuration
+    Auth AuthConfig `json:"auth"`
+    
+    // Docker configuration
+    Docker DockerConfig `json:"docker"`
+    
+    // Logging configuration
+    Logging LoggingConfig `json:"logging"`
+    
+    // Feature flags
+    Features FeatureFlags `json:"features"`
+}
+
+type ServerConfig struct {
+    Host         string        `json:"host" env:"HOST" default:"0.0.0.0"`
+    Port         int           `json:"port" env:"PORT" default:"8080"`
+    ReadTimeout  time.Duration `json:"read_timeout" env:"READ_TIMEOUT" default:"30s"`
+    WriteTimeout time.Duration `json:"write_timeout" env:"WRITE_TIMEOUT" default:"30s"`
+    IdleTimeout  time.Duration `json:"idle_timeout" env:"IDLE_TIMEOUT" default:"60s"`
+    TLSCertFile  string        `json:"tls_cert_file" env:"TLS_CERT_FILE"`
+    TLSKeyFile   string        `json:"tls_key_file" env:"TLS_KEY_FILE"`
+}
+
+type DatabaseConfig struct {
+    Host            string        `json:"host" env:"DB_HOST" default:"postgres"`
+    Port            int           `json:"port" env:"DB_PORT" default:"5432"`
+    Name            string        `json:"name" env:"DB_NAME" default:"coolify_go"`
+    User            string        `json:"user" env:"DB_USER" default:"coolify_go"`
+    Password        string        `json:"password" env:"DB_PASSWORD"`
+    SSLMode         string        `json:"ssl_mode" env:"DB_SSL_MODE" default:"disable"`
+    MaxConnections  int           `json:"max_connections" env:"DB_MAX_CONNECTIONS" default:"20"`
+    MaxIdleConns    int           `json:"max_idle_conns" env:"DB_MAX_IDLE_CONNS" default:"5"`
+    ConnMaxLifetime time.Duration `json:"conn_max_lifetime" env:"DB_CONN_MAX_LIFETIME" default:"1h"`
+}
+
+type FeatureFlags struct {
+    EnableSignup         bool `json:"enable_signup" env:"FEATURE_ENABLE_SIGNUP" default:"true"`
+    EnableTeams          bool `json:"enable_teams" env:"FEATURE_ENABLE_TEAMS" default:"true"`
+    EnableOAuth          bool `json:"enable_oauth" env:"FEATURE_ENABLE_OAUTH" default:"true"`
+    EnableWebhooks       bool `json:"enable_webhooks" env:"FEATURE_ENABLE_WEBHOOKS" default:"true"`
+    EnableMonitoring     bool `json:"enable_monitoring" env:"FEATURE_ENABLE_MONITORING" default:"true"`
+    EnableAuditLogs      bool `json:"enable_audit_logs" env:"FEATURE_ENABLE_AUDIT_LOGS" default:"true"`
+    EnableRateLimiting   bool `json:"enable_rate_limiting" env:"FEATURE_ENABLE_RATE_LIMITING" default:"true"`
+}
+```
+
+---
+
+## ✅ Acceptance Criteria Summary
+
+### **Phase 1 (Current - v1.4.0) ✅**
+- [x] Basic HTTP server with health endpoints
+- [x] Database connectivity (PostgreSQL + Redis)
+- [x] Docker containerization
+- [x] One-line installation script
+- [x] Multi-platform CI/CD with Azure Container Registry
+
+### **Phase 2 (Target - v2.0.0)**
+- [ ] Complete user authentication and authorization system
+- [ ] Team management with role-based access control
+- [ ] Server management with SSH integration
+- [ ] Basic application CRUD operations
+- [ ] Simple deployment workflow
+- [ ] Web-based dashboard
+
+### **Phase 3 (Target - v3.0.0)**
+- [ ] Advanced deployment engine with Git integration
+- [ ] Real-time logging and monitoring
+- [ ] WebSocket-based live updates
+- [ ] Domain and SSL management
+- [ ] Rollback functionality
+- [ ] Webhook integrations
+
+### **Definition of Done**
+Each feature must meet these criteria:
+- [ ] Unit tests with >80% coverage
+- [ ] Integration tests for external dependencies
+- [ ] API documentation updated
+- [ ] Security review completed
+- [ ] Performance benchmarks meet targets
+- [ ] User acceptance testing passed
+- [ ] Code review approved by 2+ developers
+- [ ] Deployment tested in staging environment
+
+---
+
+**Document Status**: Technical specification for implementation  
+**Next Review**: July 21, 2025  
+**Implementation**: To be tracked via GitHub issues and project boards

@@ -3,21 +3,22 @@ description:
 globs: 
 alwaysApply: false
 ---
-# Coolify Security Architecture & Patterns
+# Coolify Go Security Architecture & Patterns
 
 ## Security Philosophy
 
-Coolify implements **defense-in-depth security** with multiple layers of protection including authentication, authorization, encryption, network isolation, and secure deployment practices.
+Coolify Go implements **defense-in-depth security** with multiple layers of protection including authentication, authorization, encryption, network isolation, and secure deployment practices using Go's security features and best practices.
 
 ## Authentication Architecture
 
 ### Multi-Provider Authentication
-- **[Laravel Fortify](mdc:config/fortify.php)** - Core authentication scaffolding (4.9KB, 149 lines)
-- **[Laravel Sanctum](mdc:config/sanctum.php)** - API token authentication (2.4KB, 69 lines)
-- **[Laravel Socialite](mdc:config/services.php)** - OAuth provider integration
+- **JWT Authentication** - `github.com/golang-jwt/jwt/v4` for stateless API authentication
+- **OAuth Integration** - `golang.org/x/oauth2` for OAuth provider integration
+- **Password Hashing** - `golang.org/x/crypto/bcrypt` for secure password storage
+- **Session Management** - Redis-based session storage
 
 ### OAuth Integration
-- **[OauthSetting.php](mdc:app/Models/OauthSetting.php)** - OAuth provider configurations
+- **[OauthSetting](mdc:internal/models/oauth_setting.go)** - OAuth provider configurations
 - **Supported Providers**:
   - Google OAuth
   - Microsoft Azure AD
@@ -26,761 +27,808 @@ Coolify implements **defense-in-depth security** with multiple layers of protect
   - GitLab
 
 ### Authentication Models
-```php
+```go
 // User authentication with team-based access
-class User extends Authenticatable
-{
-    use HasApiTokens, HasFactory, Notifiable;
+type User struct {
+    BaseModel
+    Name                string     `json:"name" gorm:"not null"`
+    Email               string     `json:"email" gorm:"uniqueIndex;not null"`
+    Password            string     `json:"-" gorm:"not null"` // Hidden from JSON
+    EmailVerifiedAt     *time.Time `json:"email_verified_at"`
+    CurrentTeamID       *uuid.UUID `json:"current_team_id"`
+    LastLoginAt         *time.Time `json:"last_login_at"`
     
-    protected $fillable = [
-        'name', 'email', 'password'
-    ];
+    // Relationships
+    Teams               []TeamMember `json:"teams" gorm:"foreignKey:UserID"`
+    CurrentTeam         *Team        `json:"current_team" gorm:"foreignKey:CurrentTeamID"`
+    PersonalAccessTokens []PersonalAccessToken `json:"personal_access_tokens" gorm:"foreignKey:UserID"`
+}
+
+// Team membership with roles
+type TeamMember struct {
+    BaseModel
+    UserID   uuid.UUID `json:"user_id" gorm:"not null"`
+    TeamID   uuid.UUID `json:"team_id" gorm:"not null"`
+    Role     string    `json:"role" gorm:"default:'member'"`
+    JoinedAt time.Time `json:"joined_at" gorm:"autoCreateTime"`
     
-    protected $hidden = [
-        'password', 'remember_token'
-    ];
+    // Relationships
+    User     User      `json:"user" gorm:"foreignKey:UserID"`
+    Team     Team      `json:"team" gorm:"foreignKey:TeamID"`
+}
+
+// Personal access token for API authentication
+type PersonalAccessToken struct {
+    BaseModel
+    UserID    uuid.UUID  `json:"user_id" gorm:"not null"`
+    Name      string     `json:"name" gorm:"not null"`
+    Token     string     `json:"token" gorm:"uniqueIndex;not null"`
+    Abilities []string   `json:"abilities" gorm:"type:jsonb"`
+    ExpiresAt *time.Time `json:"expires_at"`
+    LastUsedAt *time.Time `json:"last_used_at"`
     
-    protected $casts = [
-        'email_verified_at' => 'datetime',
-        'password' => 'hashed',
-    ];
-    
-    public function teams(): BelongsToMany
-    {
-        return $this->belongsToMany(Team::class)
-            ->withPivot('role')
-            ->withTimestamps();
+    // Relationships
+    User      User       `json:"user" gorm:"foreignKey:UserID"`
+}
+
+// Authentication methods
+func (u *User) SetPassword(password string) error {
+    hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+    if err != nil {
+        return err
     }
-    
-    public function currentTeam(): BelongsTo
-    {
-        return $this->belongsTo(Team::class, 'current_team_id');
+    u.Password = string(hashedPassword)
+    return nil
+}
+
+func (u *User) CheckPassword(password string) bool {
+    err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
+    return err == nil
+}
+
+func (u *User) HasTeamAccess(teamID uuid.UUID) bool {
+    for _, member := range u.Teams {
+        if member.TeamID == teamID {
+            return true
+        }
     }
+    return false
+}
+
+func (u *User) HasTeamRole(teamID uuid.UUID, role string) bool {
+    for _, member := range u.Teams {
+        if member.TeamID == teamID && member.Role == role {
+            return true
+        }
+    }
+    return false
 }
 ```
 
 ## Authorization & Access Control
 
 ### Team-Based Multi-Tenancy
-- **[Team.php](mdc:app/Models/Team.php)** - Multi-tenant organization structure (8.9KB, 308 lines)
-- **[TeamInvitation.php](mdc:app/Models/TeamInvitation.php)** - Secure team collaboration
+- **[Team](mdc:internal/models/team.go)** - Multi-tenant organization structure
+- **[TeamInvitation](mdc:internal/models/team_invitation.go)** - Secure team collaboration
 - **Role-based permissions** within teams
 - **Resource isolation** by team ownership
 
 ### Authorization Patterns
-```php
+```go
 // Team-scoped authorization middleware
-class EnsureTeamAccess
-{
-    public function handle(Request $request, Closure $next): Response
-    {
-        $user = $request->user();
-        $teamId = $request->route('team');
+func TeamAccessMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        user := c.MustGet("user").(*User)
+        teamID := c.Param("teamId")
         
-        if (!$user->teams->contains('id', $teamId)) {
-            abort(403, 'Access denied to team resources');
+        if !user.HasTeamAccess(teamID) {
+            c.JSON(403, gin.H{"error": "Access denied to team resources"})
+            c.Abort()
+            return
         }
         
         // Set current team context
-        $user->switchTeam($teamId);
-        
-        return $next($request);
+        c.Set("teamId", teamID)
+        c.Next()
     }
 }
 
-// Resource-level authorization policies
-class ApplicationPolicy
-{
-    public function view(User $user, Application $application): bool
-    {
-        return $user->teams->contains('id', $application->team_id);
+// Resource-level authorization
+type ApplicationPolicy struct{}
+
+func (p *ApplicationPolicy) CanView(user *User, app *Application) bool {
+    return user.HasTeamAccess(app.TeamID)
+}
+
+func (p *ApplicationPolicy) CanDeploy(user *User, app *Application) bool {
+    return p.CanView(user, app) && 
+           user.HasTeamRole(app.TeamID, "admin") || 
+           user.HasTeamRole(app.TeamID, "deployer")
+}
+
+func (p *ApplicationPolicy) CanDelete(user *User, app *Application) bool {
+    return p.CanView(user, app) && 
+           user.HasTeamRole(app.TeamID, "admin")
+}
+
+// Authorization service
+type AuthorizationService struct {
+    policies map[string]interface{}
+}
+
+func NewAuthorizationService() *AuthorizationService {
+    return &AuthorizationService{
+        policies: map[string]interface{}{
+            "application": &ApplicationPolicy{},
+            "server":      &ServerPolicy{},
+            "database":    &DatabasePolicy{},
+        },
+    }
+}
+
+func (s *AuthorizationService) Can(user *User, action string, resource interface{}) bool {
+    // Get appropriate policy based on resource type
+    policy := s.getPolicy(resource)
+    if policy == nil {
+        return false
     }
     
-    public function deploy(User $user, Application $application): bool
-    {
-        return $this->view($user, $application) && 
-               $user->hasTeamPermission($application->team_id, 'deploy');
+    // Call policy method
+    method := reflect.ValueOf(policy).MethodByName("Can" + strings.Title(action))
+    if !method.IsValid() {
+        return false
     }
     
-    public function delete(User $user, Application $application): bool
-    {
-        return $this->view($user, $application) && 
-               $user->hasTeamRole($application->team_id, 'admin');
-    }
+    result := method.Call([]reflect.Value{
+        reflect.ValueOf(user),
+        reflect.ValueOf(resource),
+    })
+    
+    return result[0].Bool()
 }
 ```
 
 ### Global Scopes for Data Isolation
-```php
-// Automatic team-based filtering
-class Application extends Model
-{
-    protected static function booted(): void
-    {
-        static::addGlobalScope('team', function (Builder $builder) {
-            if (auth()->check() && auth()->user()->currentTeam) {
-                $builder->whereHas('environment.project', function ($query) {
-                    $query->where('team_id', auth()->user()->currentTeam->id);
-                });
-            }
-        });
-    }
+```go
+// Team-based query scoping
+func (a *Application) ScopeByTeam(db *gorm.DB, teamID uuid.UUID) *gorm.DB {
+    return db.
+        Joins("JOIN environments ON applications.environment_id = environments.id").
+        Joins("JOIN projects ON environments.project_id = projects.id").
+        Where("projects.team_id = ?", teamID)
+}
+
+// Repository with automatic team filtering
+type GORMApplicationRepository struct {
+    db *gorm.DB
+}
+
+func (r *GORMApplicationRepository) GetByTeam(ctx context.Context, teamID uuid.UUID) ([]*Application, error) {
+    var apps []*Application
+    err := r.db.WithContext(ctx).Scopes(Application{}.ScopeByTeam(r.db, teamID)).Find(&apps).Error
+    return apps, err
 }
 ```
 
 ## API Security
 
-### Token-Based Authentication
-```php
-// Sanctum API token management
-class PersonalAccessToken extends Model
-{
-    protected $fillable = [
-        'name', 'token', 'abilities', 'expires_at'
-    ];
-    
-    protected $casts = [
-        'abilities' => 'array',
-        'expires_at' => 'datetime',
-        'last_used_at' => 'datetime',
-    ];
-    
-    public function tokenable(): MorphTo
-    {
-        return $this->morphTo();
+### JWT Token-Based Authentication
+```go
+// JWT service for token management
+type JWTService struct {
+    secretKey []byte
+    issuer    string
+    duration  time.Duration
+}
+
+func NewJWTService(secretKey string, issuer string, duration time.Duration) *JWTService {
+    return &JWTService{
+        secretKey: []byte(secretKey),
+        issuer:    issuer,
+        duration:  duration,
+    }
+}
+
+func (s *JWTService) GenerateToken(user *User) (string, error) {
+    claims := jwt.RegisteredClaims{
+        Subject:   user.ID.String(),
+        Issuer:    s.issuer,
+        IssuedAt:  jwt.NewNumericDate(time.Now()),
+        ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.duration)),
+        NotBefore: jwt.NewNumericDate(time.Now()),
     }
     
-    public function hasAbility(string $ability): bool
-    {
-        return in_array('*', $this->abilities) || 
-               in_array($ability, $this->abilities);
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+    return token.SignedString(s.secretKey)
+}
+
+func (s *JWTService) ValidateToken(tokenString string) (*jwt.RegisteredClaims, error) {
+    token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
+        if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+            return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+        }
+        return s.secretKey, nil
+    })
+    
+    if err != nil {
+        return nil, err
+    }
+    
+    if claims, ok := token.Claims.(*jwt.RegisteredClaims); ok && token.Valid {
+        return claims, nil
+    }
+    
+    return nil, fmt.Errorf("invalid token")
+}
+
+// JWT authentication middleware
+func JWTAuthMiddleware(authService *AuthService) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        token := c.GetHeader("Authorization")
+        if token == "" {
+            c.JSON(401, gin.H{"error": "Authorization header required"})
+            c.Abort()
+            return
+        }
+        
+        // Remove "Bearer " prefix
+        if strings.HasPrefix(token, "Bearer ") {
+            token = token[7:]
+        }
+        
+        user, err := authService.ValidateToken(token)
+        if err != nil {
+            c.JSON(401, gin.H{"error": "Invalid token"})
+            c.Abort()
+            return
+        }
+        
+        c.Set("user", user)
+        c.Next()
     }
 }
 ```
 
 ### API Rate Limiting
-```php
-// Rate limiting configuration
-RateLimiter::for('api', function (Request $request) {
-    return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
-});
+```go
+// Rate limiting middleware using golang.org/x/time/rate
+func RateLimitMiddleware(limit int, window time.Duration) gin.HandlerFunc {
+    limiter := rate.NewLimiter(rate.Every(window/time.Duration(limit)), limit)
+    
+    return func(c *gin.Context) {
+        if !limiter.Allow() {
+            c.JSON(429, gin.H{"error": "Rate limit exceeded"})
+            c.Abort()
+            return
+        }
+        c.Next()
+    }
+}
 
-RateLimiter::for('deployments', function (Request $request) {
-    return Limit::perMinute(10)->by($request->user()->id);
-});
-
-RateLimiter::for('webhooks', function (Request $request) {
-    return Limit::perMinute(100)->by($request->ip());
-});
+// Different rate limits for different endpoints
+func SetupRateLimiting(r *gin.Engine) {
+    // API rate limiting
+    apiGroup := r.Group("/api")
+    apiGroup.Use(RateLimitMiddleware(60, time.Minute)) // 60 requests per minute
+    
+    // Deployment rate limiting
+    deploymentGroup := r.Group("/api/deployments")
+    deploymentGroup.Use(RateLimitMiddleware(10, time.Minute)) // 10 deployments per minute
+    
+    // Webhook rate limiting
+    webhookGroup := r.Group("/webhooks")
+    webhookGroup.Use(RateLimitMiddleware(100, time.Minute)) // 100 webhooks per minute
+}
 ```
 
 ### API Input Validation
-```php
-// Comprehensive input validation
-class StoreApplicationRequest extends FormRequest
-{
-    public function authorize(): bool
-    {
-        return $this->user()->can('create', Application::class);
+```go
+// Request validation with struct tags
+type CreateApplicationRequest struct {
+    Name              string            `json:"name" binding:"required,min=2,max=100,alphanum"`
+    Description       string            `json:"description" binding:"max=500"`
+    GitRepository     string            `json:"git_repository" binding:"required,url,startswith=https://"`
+    GitBranch         string            `json:"git_branch" binding:"required,min=1,max=100,alphanumdash"`
+    BuildPack         string            `json:"build_pack" binding:"required,oneof=nodejs python php ruby java go rust"`
+    Port              int               `json:"port" binding:"required,min=1,max=65535"`
+    ServerID          string            `json:"server_id" binding:"required,uuid"`
+    EnvironmentVars   map[string]string `json:"environment_variables" binding:"max=100"`
+}
+
+// Custom validation
+func (r *CreateApplicationRequest) Validate() error {
+    // Custom validation logic
+    if !strings.HasPrefix(r.GitRepository, "https://") {
+        return errors.New("Git repository must use HTTPS")
     }
     
-    public function rules(): array
-    {
-        return [
-            'name' => 'required|string|max:255|regex:/^[a-zA-Z0-9\-_]+$/',
-            'git_repository' => 'required|url|starts_with:https://',
-            'git_branch' => 'required|string|max:100|regex:/^[a-zA-Z0-9\-_\/]+$/',
-            'server_id' => 'required|exists:servers,id',
-            'environment_id' => 'required|exists:environments,id',
-            'environment_variables' => 'array',
-            'environment_variables.*' => 'string|max:1000',
-        ];
+    if r.Port < 1 || r.Port > 65535 {
+        return errors.New("Port must be between 1 and 65535")
     }
     
-    public function prepareForValidation(): void
-    {
-        $this->merge([
-            'name' => strip_tags($this->name),
-            'git_repository' => filter_var($this->git_repository, FILTER_SANITIZE_URL),
-        ]);
+    // Validate environment variable names
+    for key := range r.EnvironmentVars {
+        if !isValidEnvVarName(key) {
+            return fmt.Errorf("invalid environment variable name: %s", key)
+        }
     }
+    
+    return nil
+}
+
+func isValidEnvVarName(name string) bool {
+    if len(name) == 0 {
+        return false
+    }
+    
+    // Environment variable names must start with a letter or underscore
+    if !unicode.IsLetter(rune(name[0])) && name[0] != '_' {
+        return false
+    }
+    
+    // And contain only letters, digits, and underscores
+    for _, char := range name {
+        if !unicode.IsLetter(char) && !unicode.IsDigit(char) && char != '_' {
+            return false
+        }
+    }
+    
+    return true
+}
+
+// Handler with validation
+func (h *ApplicationHandler) Create(c *gin.Context) {
+    var req CreateApplicationRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(400, gin.H{"error": "Invalid request data", "details": err.Error()})
+        return
+    }
+    
+    // Custom validation
+    if err := req.Validate(); err != nil {
+        c.JSON(400, gin.H{"error": err.Error()})
+        return
+    }
+    
+    user := c.MustGet("user").(*User)
+    app, err := h.service.CreateApplication(c.Request.Context(), &req, user.ID)
+    if err != nil {
+        c.JSON(500, gin.H{"error": err.Error()})
+        return
+    }
+    
+    c.JSON(201, gin.H{"data": app})
 }
 ```
 
-## SSH Security
+## Data Protection & Encryption
 
-### Private Key Management
-- **[PrivateKey.php](mdc:app/Models/PrivateKey.php)** - Secure SSH key storage (6.5KB, 247 lines)
-- **Encrypted key storage** in database
-- **Key rotation** capabilities
-- **Access logging** for key usage
+### Environment Variable Encryption
+```go
+// Encrypted environment variable storage
+type EnvironmentVariable struct {
+    BaseModel
+    ApplicationID uuid.UUID `json:"application_id" gorm:"not null"`
+    Key           string    `json:"key" gorm:"not null"`
+    Value         string    `json:"value" gorm:"not null"`
+    IsEncrypted   bool      `json:"is_encrypted" gorm:"default:false"`
+    
+    // Relationships
+    Application   Application `json:"application" gorm:"foreignKey:ApplicationID"`
+}
 
-### SSH Connection Security
-```php
-class SshConnection
-{
-    private string $host;
-    private int $port;
-    private string $username;
-    private PrivateKey $privateKey;
-    
-    public function __construct(Server $server)
-    {
-        $this->host = $server->ip;
-        $this->port = $server->port;
-        $this->username = $server->user;
-        $this->privateKey = $server->privateKey;
+// Encryption service
+type EncryptionService struct {
+    key []byte
+}
+
+func NewEncryptionService(key string) *EncryptionService {
+    return &EncryptionService{key: []byte(key)}
+}
+
+func (s *EncryptionService) Encrypt(data string) (string, error) {
+    block, err := aes.NewCipher(s.key)
+    if err != nil {
+        return "", err
     }
     
-    public function connect(): bool
-    {
-        $connection = ssh2_connect($this->host, $this->port);
-        
-        if (!$connection) {
-            throw new SshConnectionException('Failed to connect to server');
-        }
-        
-        // Use private key authentication
-        $privateKeyContent = decrypt($this->privateKey->private_key);
-        $publicKeyContent = decrypt($this->privateKey->public_key);
-        
-        if (!ssh2_auth_pubkey_file($connection, $this->username, $publicKeyContent, $privateKeyContent)) {
-            throw new SshAuthenticationException('SSH authentication failed');
-        }
-        
-        return true;
+    gcm, err := cipher.NewGCM(block)
+    if err != nil {
+        return "", err
     }
     
-    public function execute(string $command): string
-    {
-        // Sanitize command to prevent injection
-        $command = escapeshellcmd($command);
-        
-        $stream = ssh2_exec($this->connection, $command);
-        
-        if (!$stream) {
-            throw new SshExecutionException('Failed to execute command');
-        }
-        
-        return stream_get_contents($stream);
+    nonce := make([]byte, gcm.NonceSize())
+    if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+        return "", err
     }
+    
+    ciphertext := gcm.Seal(nonce, nonce, []byte(data), nil)
+    return base64.StdEncoding.EncodeToString(ciphertext), nil
+}
+
+func (s *EncryptionService) Decrypt(encryptedData string) (string, error) {
+    data, err := base64.StdEncoding.DecodeString(encryptedData)
+    if err != nil {
+        return "", err
+    }
+    
+    block, err := aes.NewCipher(s.key)
+    if err != nil {
+        return "", err
+    }
+    
+    gcm, err := cipher.NewGCM(block)
+    if err != nil {
+        return "", err
+    }
+    
+    nonceSize := gcm.NonceSize()
+    if len(data) < nonceSize {
+        return "", errors.New("ciphertext too short")
+    }
+    
+    nonce, ciphertext := data[:nonceSize], data[nonceSize:]
+    plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+    if err != nil {
+        return "", err
+    }
+    
+    return string(plaintext), nil
+}
+
+// Environment variable methods
+func (ev *EnvironmentVariable) SetValue(value string, encrypt bool, encryptionService *EncryptionService) error {
+    if encrypt {
+        encrypted, err := encryptionService.Encrypt(value)
+        if err != nil {
+            return err
+        }
+        ev.Value = encrypted
+        ev.IsEncrypted = true
+    } else {
+        ev.Value = value
+        ev.IsEncrypted = false
+    }
+    return nil
+}
+
+func (ev *EnvironmentVariable) GetValue(encryptionService *EncryptionService) (string, error) {
+    if ev.IsEncrypted {
+        return encryptionService.Decrypt(ev.Value)
+    }
+    return ev.Value, nil
 }
 ```
 
-## Container Security
+### SSH Key Management
+```go
+// Secure SSH key storage
+type PrivateKey struct {
+    BaseModel
+    Name        string    `json:"name" gorm:"not null"`
+    PrivateKey  string    `json:"private_key" gorm:"not null"`
+    PublicKey   string    `json:"public_key" gorm:"not null"`
+    IsEncrypted bool      `json:"is_encrypted" gorm:"default:true"`
+    TeamID      uuid.UUID `json:"team_id" gorm:"not null"`
+    
+    // Relationships
+    Team        Team      `json:"team" gorm:"foreignKey:TeamID"`
+    Servers     []Server  `json:"servers" gorm:"foreignKey:SSHKeyID"`
+}
 
-### Docker Security Patterns
-```php
-class DockerSecurityService
-{
-    public function createSecureContainer(Application $application): array
-    {
-        return [
-            'image' => $this->validateImageName($application->docker_image),
-            'user' => '1000:1000', // Non-root user
-            'read_only' => true,
-            'no_new_privileges' => true,
-            'security_opt' => [
-                'no-new-privileges:true',
-                'apparmor:docker-default'
-            ],
-            'cap_drop' => ['ALL'],
-            'cap_add' => ['CHOWN', 'SETUID', 'SETGID'], // Minimal capabilities
-            'tmpfs' => [
-                '/tmp' => 'rw,noexec,nosuid,size=100m',
-                '/var/tmp' => 'rw,noexec,nosuid,size=50m'
-            ],
-            'ulimits' => [
-                'nproc' => 1024,
-                'nofile' => 1024
-            ]
-        ];
+// SSH key service
+type SSHKeyService struct {
+    encryptionService *EncryptionService
+}
+
+func NewSSHKeyService(encryptionService *EncryptionService) *SSHKeyService {
+    return &SSHKeyService{encryptionService: encryptionService}
+}
+
+func (s *SSHKeyService) GenerateKeyPair(name string) (*PrivateKey, error) {
+    // Generate RSA key pair
+    privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+    if err != nil {
+        return nil, err
     }
     
-    private function validateImageName(string $image): string
-    {
-        // Validate image name against allowed registries
-        $allowedRegistries = ['docker.io', 'ghcr.io', 'quay.io'];
-        
-        $parser = new DockerImageParser();
-        $parsed = $parser->parse($image);
-        
-        if (!in_array($parsed['registry'], $allowedRegistries)) {
-            throw new SecurityException('Image registry not allowed');
-        }
-        
-        return $image;
+    // Encode private key
+    privateKeyPEM := &pem.Block{
+        Type:  "RSA PRIVATE KEY",
+        Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
     }
+    privateKeyBytes := pem.EncodeToMemory(privateKeyPEM)
+    
+    // Encode public key
+    publicKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
+    if err != nil {
+        return nil, err
+    }
+    publicKeyBytes := ssh.MarshalAuthorizedKey(publicKey)
+    
+    // Encrypt private key
+    encryptedPrivateKey, err := s.encryptionService.Encrypt(string(privateKeyBytes))
+    if err != nil {
+        return nil, err
+    }
+    
+    return &PrivateKey{
+        Name:        name,
+        PrivateKey:  encryptedPrivateKey,
+        PublicKey:   string(publicKeyBytes),
+        IsEncrypted: true,
+    }, nil
+}
+
+func (s *SSHKeyService) DecryptPrivateKey(key *PrivateKey) (string, error) {
+    if !key.IsEncrypted {
+        return key.PrivateKey, nil
+    }
+    return s.encryptionService.Decrypt(key.PrivateKey)
 }
 ```
 
-### Network Isolation
-```yaml
-# Docker Compose security configuration
-version: '3.8'
-services:
-  app:
-    image: ${APP_IMAGE}
-    networks:
-      - app-network
-    security_opt:
-      - no-new-privileges:true
-      - apparmor:docker-default
-    read_only: true
-    tmpfs:
-      - /tmp:rw,noexec,nosuid,size=100m
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN
-      - SETUID
-      - SETGID
+## Network Security
 
-networks:
-  app-network:
-    driver: bridge
-    internal: true
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
-```
-
-## SSL/TLS Security
-
-### Certificate Management
-- **[SslCertificate.php](mdc:app/Models/SslCertificate.php)** - SSL certificate automation
-- **Let's Encrypt** integration for free certificates
-- **Automatic renewal** and monitoring
-- **Custom certificate** upload support
-
-### SSL Configuration
-```php
-class SslCertificateService
-{
-    public function generateCertificate(Application $application): SslCertificate
-    {
-        $domains = $this->validateDomains($application->getAllDomains());
-        
-        $certificate = SslCertificate::create([
-            'application_id' => $application->id,
-            'domains' => $domains,
-            'provider' => 'letsencrypt',
-            'status' => 'pending'
-        ]);
-        
-        // Generate certificate using ACME protocol
-        $acmeClient = new AcmeClient();
-        $certData = $acmeClient->generateCertificate($domains);
-        
-        $certificate->update([
-            'certificate' => encrypt($certData['certificate']),
-            'private_key' => encrypt($certData['private_key']),
-            'chain' => encrypt($certData['chain']),
-            'expires_at' => $certData['expires_at'],
-            'status' => 'active'
-        ]);
-        
-        return $certificate;
-    }
-    
-    private function validateDomains(array $domains): array
-    {
-        foreach ($domains as $domain) {
-            if (!filter_var($domain, FILTER_VALIDATE_DOMAIN)) {
-                throw new InvalidDomainException("Invalid domain: {$domain}");
-            }
-            
-            // Check domain ownership
-            if (!$this->verifyDomainOwnership($domain)) {
-                throw new DomainOwnershipException("Domain ownership verification failed: {$domain}");
-            }
-        }
-        
-        return $domains;
-    }
-}
-```
-
-## Environment Variable Security
-
-### Secure Configuration Management
-```php
-class EnvironmentVariable extends Model
-{
-    protected $fillable = [
-        'key', 'value', 'is_secret', 'application_id'
-    ];
-    
-    protected $casts = [
-        'is_secret' => 'boolean',
-        'value' => 'encrypted' // Automatic encryption for sensitive values
-    ];
-    
-    public function setValueAttribute($value): void
-    {
-        // Automatically encrypt sensitive environment variables
-        if ($this->isSensitiveKey($this->key)) {
-            $this->attributes['value'] = encrypt($value);
-            $this->attributes['is_secret'] = true;
-        } else {
-            $this->attributes['value'] = $value;
-        }
-    }
-    
-    public function getValueAttribute($value): string
-    {
-        if ($this->is_secret) {
-            return decrypt($value);
-        }
-        
-        return $value;
-    }
-    
-    private function isSensitiveKey(string $key): bool
-    {
-        $sensitivePatterns = [
-            'PASSWORD', 'SECRET', 'KEY', 'TOKEN', 'API_KEY',
-            'DATABASE_URL', 'REDIS_URL', 'PRIVATE', 'CREDENTIAL',
-            'AUTH', 'CERTIFICATE', 'ENCRYPTION', 'SALT', 'HASH',
-            'OAUTH', 'JWT', 'BEARER', 'ACCESS', 'REFRESH'
-        ];
-        
-        foreach ($sensitivePatterns as $pattern) {
-            if (str_contains(strtoupper($key), $pattern)) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-}
-```
-
-## Webhook Security
-
-### Webhook Signature Verification
-```php
-class WebhookSecurityService
-{
-    public function verifyGitHubSignature(Request $request, string $secret): bool
-    {
-        $signature = $request->header('X-Hub-Signature-256');
-        
-        if (!$signature) {
-            return false;
-        }
-        
-        $expectedSignature = 'sha256=' . hash_hmac('sha256', $request->getContent(), $secret);
-        
-        return hash_equals($expectedSignature, $signature);
-    }
-    
-    public function verifyGitLabSignature(Request $request, string $secret): bool
-    {
-        $signature = $request->header('X-Gitlab-Token');
-        
-        return hash_equals($secret, $signature);
-    }
-    
-    public function validateWebhookPayload(array $payload): array
-    {
-        // Sanitize and validate webhook payload
-        $validator = Validator::make($payload, [
-            'repository.clone_url' => 'required|url|starts_with:https://',
-            'ref' => 'required|string|max:255',
-            'head_commit.id' => 'required|string|size:40', // Git SHA
-            'head_commit.message' => 'required|string|max:1000'
-        ]);
-        
-        if ($validator->fails()) {
-            throw new InvalidWebhookPayloadException('Invalid webhook payload');
-        }
-        
-        return $validator->validated();
-    }
-}
-```
-
-## Input Sanitization & Validation
-
-### XSS Prevention
-```php
-class SecurityMiddleware
-{
-    public function handle(Request $request, Closure $next): Response
-    {
-        // Sanitize input data
-        $input = $request->all();
-        $sanitized = $this->sanitizeInput($input);
-        $request->merge($sanitized);
-        
-        return $next($request);
-    }
-    
-    private function sanitizeInput(array $input): array
-    {
-        foreach ($input as $key => $value) {
-            if (is_string($value)) {
-                // Remove potentially dangerous HTML tags
-                $input[$key] = strip_tags($value, '<p><br><strong><em>');
-                
-                // Escape special characters
-                $input[$key] = htmlspecialchars($input[$key], ENT_QUOTES, 'UTF-8');
-            } elseif (is_array($value)) {
-                $input[$key] = $this->sanitizeInput($value);
-            }
-        }
-        
-        return $input;
-    }
-}
-```
-
-### SQL Injection Prevention
-```php
-// Always use parameterized queries and Eloquent ORM
-class ApplicationRepository
-{
-    public function findByName(string $name): ?Application
-    {
-        // Safe: Uses parameter binding
-        return Application::where('name', $name)->first();
-    }
-    
-    public function searchApplications(string $query): Collection
-    {
-        // Safe: Eloquent handles escaping
-        return Application::where('name', 'LIKE', "%{$query}%")
-            ->orWhere('description', 'LIKE', "%{$query}%")
-            ->get();
-    }
-    
-    // NEVER do this - vulnerable to SQL injection
-    // public function unsafeSearch(string $query): Collection
-    // {
-    //     return DB::select("SELECT * FROM applications WHERE name LIKE '%{$query}%'");
-    // }
-}
-```
-
-## Audit Logging & Monitoring
-
-### Activity Logging
-```php
-// Using Spatie Activity Log package
-class Application extends Model
-{
-    use LogsActivity;
-    
-    protected static $logAttributes = [
-        'name', 'git_repository', 'git_branch', 'fqdn'
-    ];
-    
-    protected static $logOnlyDirty = true;
-    
-    public function getDescriptionForEvent(string $eventName): string
-    {
-        return "Application {$this->name} was {$eventName}";
-    }
+### HTTPS/TLS Configuration
+```go
+// TLS configuration for secure connections
+type TLSConfig struct {
+    CertFile string `json:"cert_file"`
+    KeyFile  string `json:"key_file"`
+    MinTLS   string `json:"min_tls" default:"1.2"`
 }
 
-// Custom security events
-class SecurityEventLogger
-{
-    public function logFailedLogin(string $email, string $ip): void
-    {
-        activity('security')
-            ->withProperties([
-                'email' => $email,
-                'ip' => $ip,
-                'user_agent' => request()->userAgent()
-            ])
-            ->log('Failed login attempt');
+func (c *TLSConfig) GetTLSConfig() (*tls.Config, error) {
+    cert, err := tls.LoadX509KeyPair(c.CertFile, c.KeyFile)
+    if err != nil {
+        return nil, err
     }
     
-    public function logSuspiciousActivity(User $user, string $activity): void
-    {
-        activity('security')
-            ->causedBy($user)
-            ->withProperties([
-                'activity' => $activity,
-                'ip' => request()->ip(),
-                'timestamp' => now()
-            ])
-            ->log('Suspicious activity detected');
-    }
+    return &tls.Config{
+        Certificates: []tls.Certificate{cert},
+        MinVersion:   tls.VersionTLS12,
+        CipherSuites: []uint16{
+            tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+            tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+            tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+            tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+        },
+    }, nil
 }
-```
 
-### Security Monitoring
-```php
-class SecurityMonitoringService
-{
-    public function detectAnomalousActivity(User $user): bool
-    {
-        // Check for unusual login patterns
-        $recentLogins = $user->activities()
-            ->where('description', 'like', '%login%')
-            ->where('created_at', '>=', now()->subHours(24))
-            ->get();
-        
-        // Multiple failed attempts
-        $failedAttempts = $recentLogins->where('description', 'Failed login attempt')->count();
-        if ($failedAttempts > 5) {
-            $this->triggerSecurityAlert($user, 'Multiple failed login attempts');
-            return true;
-        }
-        
-        // Login from new location
-        $uniqueIps = $recentLogins->pluck('properties.ip')->unique();
-        if ($uniqueIps->count() > 3) {
-            $this->triggerSecurityAlert($user, 'Login from multiple IP addresses');
-            return true;
-        }
-        
-        return false;
+// Secure server setup
+func setupSecureServer(config *Config) (*http.Server, error) {
+    tlsConfig, err := config.TLS.GetTLSConfig()
+    if err != nil {
+        return nil, err
     }
     
-    private function triggerSecurityAlert(User $user, string $reason): void
-    {
-        // Send security notification
-        $user->notify(new SecurityAlertNotification($reason));
-        
-        // Log security event
-        activity('security')
-            ->causedBy($user)
-            ->withProperties(['reason' => $reason])
-            ->log('Security alert triggered');
-    }
-}
-```
-
-## Backup Security
-
-### Encrypted Backups
-```php
-class SecureBackupService
-{
-    public function createEncryptedBackup(ScheduledDatabaseBackup $backup): void
-    {
-        $database = $backup->database;
-        $dumpPath = $this->createDatabaseDump($database);
-        
-        // Encrypt backup file
-        $encryptedPath = $this->encryptFile($dumpPath, $backup->encryption_key);
-        
-        // Upload to secure storage
-        $this->uploadToSecureStorage($encryptedPath, $backup->s3Storage);
-        
-        // Clean up local files
-        unlink($dumpPath);
-        unlink($encryptedPath);
+    server := &http.Server{
+        Addr:      config.Server.Addr,
+        TLSConfig: tlsConfig,
+        // Security headers
+        Handler: addSecurityHeaders(http.DefaultServeMux),
     }
     
-    private function encryptFile(string $filePath, string $key): string
-    {
-        $data = file_get_contents($filePath);
-        $encryptedData = encrypt($data, $key);
-        
-        $encryptedPath = $filePath . '.encrypted';
-        file_put_contents($encryptedPath, $encryptedData);
-        
-        return $encryptedPath;
-    }
+    return server, nil
 }
-```
 
-## Security Headers & CORS
-
-### Security Headers Configuration
-```php
-// Security headers middleware
-class SecurityHeadersMiddleware
-{
-    public function handle(Request $request, Closure $next): Response
-    {
-        $response = $next($request);
+func addSecurityHeaders(handler http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Security headers
+        w.Header().Set("X-Content-Type-Options", "nosniff")
+        w.Header().Set("X-Frame-Options", "DENY")
+        w.Header().Set("X-XSS-Protection", "1; mode=block")
+        w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        w.Header().Set("Content-Security-Policy", "default-src 'self'")
+        w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
         
-        $response->headers->set('X-Content-Type-Options', 'nosniff');
-        $response->headers->set('X-Frame-Options', 'DENY');
-        $response->headers->set('X-XSS-Protection', '1; mode=block');
-        $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
-        $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-        
-        if ($request->secure()) {
-            $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-        }
-        
-        return $response;
-    }
+        handler.ServeHTTP(w, r)
+    })
 }
 ```
 
 ### CORS Configuration
-```php
-// CORS configuration for API endpoints
-return [
-    'paths' => ['api/*', 'webhooks/*'],
-    'allowed_methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    'allowed_origins' => [
-        'https://app.coolify.io',
-        'https://*.coolify.io'
-    ],
-    'allowed_origins_patterns' => [],
-    'allowed_headers' => ['*'],
-    'exposed_headers' => [],
-    'max_age' => 0,
-    'supports_credentials' => true,
-];
+```go
+// CORS middleware for API access
+func CORSMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        c.Header("Access-Control-Allow-Origin", "*")
+        c.Header("Access-Control-Allow-Credentials", "true")
+        c.Header("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+        c.Header("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
+        
+        if c.Request.Method == "OPTIONS" {
+            c.AbortWithStatus(204)
+            return
+        }
+        
+        c.Next()
+    }
+}
+```
+
+## Audit Logging
+
+### Activity Logging
+```go
+// Activity log model
+type ActivityLog struct {
+    BaseModel
+    UserID       uuid.UUID              `json:"user_id"`
+    TeamID       *uuid.UUID             `json:"team_id"`
+    Action       string                 `json:"action" gorm:"not null"`
+    ResourceType string                 `json:"resource_type"`
+    ResourceID   *uuid.UUID             `json:"resource_id"`
+    Description  string                 `json:"description"`
+    Properties   datatypes.JSON         `json:"properties"`
+    IPAddress    string                 `json:"ip_address"`
+    UserAgent    string                 `json:"user_agent"`
+    
+    // Relationships
+    User         User                   `json:"user" gorm:"foreignKey:UserID"`
+    Team         *Team                  `json:"team" gorm:"foreignKey:TeamID"`
+}
+
+// Activity logging service
+type ActivityLogService struct {
+    db *gorm.DB
+}
+
+func NewActivityLogService(db *gorm.DB) *ActivityLogService {
+    return &ActivityLogService{db: db}
+}
+
+func (s *ActivityLogService) Log(ctx context.Context, userID uuid.UUID, action string, resourceType string, resourceID *uuid.UUID, description string, properties map[string]interface{}) error {
+    log := &ActivityLog{
+        UserID:       userID,
+        Action:       action,
+        ResourceType: resourceType,
+        ResourceID:   resourceID,
+        Description:  description,
+        Properties:   properties,
+    }
+    
+    // Extract IP and User-Agent from context
+    if req, ok := ctx.Value("request").(*http.Request); ok {
+        log.IPAddress = getClientIP(req)
+        log.UserAgent = req.UserAgent()
+    }
+    
+    return s.db.WithContext(ctx).Create(log).Error
+}
+
+func getClientIP(req *http.Request) string {
+    // Check for forwarded headers
+    if ip := req.Header.Get("X-Forwarded-For"); ip != "" {
+        return strings.Split(ip, ",")[0]
+    }
+    if ip := req.Header.Get("X-Real-IP"); ip != "" {
+        return ip
+    }
+    return req.RemoteAddr
+}
+
+// Middleware for automatic logging
+func ActivityLogMiddleware(activityService *ActivityLogService) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // Store request in context for logging
+        c.Set("request", c.Request)
+        
+        c.Next()
+        
+        // Log the request
+        if user, exists := c.Get("user"); exists {
+            userID := user.(*User).ID
+            action := c.Request.Method + " " + c.Request.URL.Path
+            
+            go func() {
+                activityService.Log(c.Request.Context(), userID, action, "", nil, "", nil)
+            }()
+        }
+    }
+}
+```
+
+## Security Headers & CSP
+
+### Content Security Policy
+```go
+// CSP configuration
+type CSPConfig struct {
+    DefaultSrc []string `json:"default_src" default:"['self']"`
+    ScriptSrc  []string `json:"script_src" default:"['self','unsafe-inline']"`
+    StyleSrc   []string `json:"style_src" default:"['self','unsafe-inline']"`
+    ImgSrc     []string `json:"img_src" default:"['self','data:','https:']"`
+    ConnectSrc []string `json:"connect_src" default:"['self']"`
+    FontSrc    []string `json:"font_src" default:"['self']"`
+    ObjectSrc  []string `json:"object_src" default:"['none']"`
+    MediaSrc   []string `json:"media_src" default:"['self']"`
+    FrameSrc   []string `json:"frame_src" default:"['none']"`
+}
+
+func (c *CSPConfig) GetPolicy() string {
+    policy := []string{}
+    
+    if len(c.DefaultSrc) > 0 {
+        policy = append(policy, fmt.Sprintf("default-src %s", strings.Join(c.DefaultSrc, " ")))
+    }
+    if len(c.ScriptSrc) > 0 {
+        policy = append(policy, fmt.Sprintf("script-src %s", strings.Join(c.ScriptSrc, " ")))
+    }
+    if len(c.StyleSrc) > 0 {
+        policy = append(policy, fmt.Sprintf("style-src %s", strings.Join(c.StyleSrc, " ")))
+    }
+    if len(c.ImgSrc) > 0 {
+        policy = append(policy, fmt.Sprintf("img-src %s", strings.Join(c.ImgSrc, " ")))
+    }
+    if len(c.ConnectSrc) > 0 {
+        policy = append(policy, fmt.Sprintf("connect-src %s", strings.Join(c.ConnectSrc, " ")))
+    }
+    if len(c.FontSrc) > 0 {
+        policy = append(policy, fmt.Sprintf("font-src %s", strings.Join(c.FontSrc, " ")))
+    }
+    if len(c.ObjectSrc) > 0 {
+        policy = append(policy, fmt.Sprintf("object-src %s", strings.Join(c.ObjectSrc, " ")))
+    }
+    if len(c.MediaSrc) > 0 {
+        policy = append(policy, fmt.Sprintf("media-src %s", strings.Join(c.MediaSrc, " ")))
+    }
+    if len(c.FrameSrc) > 0 {
+        policy = append(policy, fmt.Sprintf("frame-src %s", strings.Join(c.FrameSrc, " ")))
+    }
+    
+    return strings.Join(policy, "; ")
+}
 ```
 
 ## Security Testing
 
 ### Security Test Patterns
-```php
-// Security-focused tests
-test('prevents SQL injection in search', function () {
-    $user = User::factory()->create();
-    $maliciousInput = "'; DROP TABLE applications; --";
+```go
+// Security testing examples
+func TestAuthentication_Security(t *testing.T) {
+    tests := []struct {
+        name        string
+        password    string
+        expectError bool
+    }{
+        {"weak password", "123", true},
+        {"strong password", "StrongP@ssw0rd!", false},
+        {"empty password", "", true},
+    }
     
-    $response = $this->actingAs($user)
-        ->getJson("/api/v1/applications?search={$maliciousInput}");
-    
-    $response->assertStatus(200);
-    
-    // Verify applications table still exists
-    expect(Schema::hasTable('applications'))->toBeTrue();
-});
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            user := &User{}
+            err := user.SetPassword(tt.password)
+            
+            if tt.expectError {
+                assert.Error(t, err)
+            } else {
+                assert.NoError(t, err)
+                assert.True(t, user.CheckPassword(tt.password))
+            }
+        })
+    }
+}
 
-test('prevents XSS in application names', function () {
-    $user = User::factory()->create();
-    $xssPayload = '<script>alert("xss")</script>';
+func TestAuthorization_Security(t *testing.T) {
+    user := &User{BaseModel: models.BaseModel{ID: uuid.New()}}
+    teamID := uuid.New()
     
-    $response = $this->actingAs($user)
-        ->postJson('/api/v1/applications', [
-            'name' => $xssPayload,
-            'git_repository' => 'https://github.com/user/repo.git',
-            'server_id' => Server::factory()->create()->id
-        ]);
+    // User should not have access to team by default
+    assert.False(t, user.HasTeamAccess(teamID))
     
-    $response->assertStatus(422);
-});
-
-test('enforces team isolation', function () {
-    $user1 = User::factory()->create();
-    $user2 = User::factory()->create();
+    // Add user to team
+    user.Teams = []TeamMember{
+        {TeamID: teamID, Role: "member"},
+    }
     
-    $team1 = Team::factory()->create();
-    $team2 = Team::factory()->create();
-    
-    $user1->teams()->attach($team1);
-    $user2->teams()->attach($team2);
-    
-    $application = Application::factory()->create(['team_id' => $team1->id]);
-    
-    $response = $this->actingAs($user2)
-        ->getJson("/api/v1/applications/{$application->id}");
-    
-    $response->assertStatus(403);
-});
+    // User should now have access
+    assert.True(t, user.HasTeamAccess(teamID))
+    assert.True(t, user.HasTeamRole(teamID, "member"))
+    assert.False(t, user.HasTeamRole(teamID, "admin"))
+}
 ```

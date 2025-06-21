@@ -3,604 +3,1221 @@ description:
 globs: 
 alwaysApply: false
 ---
-# Coolify Testing Architecture & Patterns
+# Coolify Go Testing Patterns
 
-## Testing Philosophy
+## Testing Strategy
 
-Coolify employs **comprehensive testing strategies** using modern PHP testing frameworks to ensure reliability of deployment operations, infrastructure management, and user interactions.
+Coolify Go implements a **comprehensive testing strategy** using Go's built-in testing framework, supplemented with modern testing tools and best practices for reliable, maintainable tests.
 
 ## Testing Framework Stack
 
-### Core Testing Tools
-- **Pest PHP 3.8+** - Primary testing framework with expressive syntax
-- **Laravel Dusk** - Browser automation and end-to-end testing
-- **PHPUnit** - Underlying unit testing framework
-- **Mockery** - Mocking and stubbing for isolated tests
+### **Core Testing Tools**
+- **Go Testing**: Built-in testing framework (`testing` package)
+- **Testify**: Testing utilities and assertions (`github.com/stretchr/testify`)
+- **Gomock**: Mock generation (`github.com/golang/mock`)
+- **Testcontainers**: Integration testing with containers (`github.com/testcontainers/testcontainers-go`)
+- **Golangci-lint**: Code quality and testing enforcement
 
-### Testing Configuration
-- **[tests/Pest.php](mdc:tests/Pest.php)** - Pest configuration and global setup (1.5KB, 45 lines)
-- **[tests/TestCase.php](mdc:tests/TestCase.php)** - Base test case class (163B, 11 lines)
-- **[tests/CreatesApplication.php](mdc:tests/CreatesApplication.php)** - Application factory trait (375B, 22 lines)
-- **[tests/DuskTestCase.php](mdc:tests/DuskTestCase.php)** - Browser testing setup (1.4KB, 58 lines)
+### **Test Dependencies** ([go.mod](mdc:go-src/go.mod))
+```go
+require (
+	github.com/stretchr/testify v1.8.4
+	github.com/golang/mock v1.6.0
+	github.com/testcontainers/testcontainers-go v0.26.0
+	github.com/ory/dockertest/v3 v3.10.0
+	golang.org/x/tools v0.15.0 // for mockgen
+)
+```
 
-## Test Directory Structure
+## Test Organization Structure
 
-### Test Organization
-- **[tests/Feature/](mdc:tests/Feature)** - Feature and integration tests
-- **[tests/Unit/](mdc:tests/Unit)** - Unit tests for isolated components
-- **[tests/Browser/](mdc:tests/Browser)** - Laravel Dusk browser tests
-- **[tests/Traits/](mdc:tests/Traits)** - Shared testing utilities
+### **Test Directory Layout**
+```
+├── internal/
+│   ├── handlers/
+│   │   ├── application_test.go
+│   │   └── server_test.go
+│   ├── services/
+│   │   ├── application_service_test.go
+│   │   └── server_service_test.go
+│   ├── repository/
+│   │   ├── application_repository_test.go
+│   │   └── server_repository_test.go
+│   └── models/
+│       └── application_test.go
+├── pkg/
+│   ├── docker/
+│   │   └── client_test.go
+│   └── git/
+│       └── repository_test.go
+├── cmd/
+│   └── server/
+│       └── main_test.go
+└── tests/
+    ├── integration/
+    │   ├── api_test.go
+    │   └── database_test.go
+    ├── e2e/
+    │   └── deployment_test.go
+    └── fixtures/
+        ├── applications.json
+        └── servers.json
+```
 
 ## Unit Testing Patterns
 
-### Model Testing
-```php
-// Testing Eloquent models
-test('application model has correct relationships', function () {
-    $application = Application::factory()->create();
-    
-    expect($application->server)->toBeInstanceOf(Server::class);
-    expect($application->environment)->toBeInstanceOf(Environment::class);
-    expect($application->deployments)->toBeInstanceOf(Collection::class);
-});
+### **Service Layer Testing**
 
-test('application can generate deployment configuration', function () {
-    $application = Application::factory()->create([
-        'name' => 'test-app',
-        'git_repository' => 'https://github.com/user/repo.git'
-    ]);
-    
-    $config = $application->generateDockerCompose();
-    
-    expect($config)->toContain('test-app');
-    expect($config)->toContain('image:');
-    expect($config)->toContain('networks:');
-});
+#### **Application Service Tests**
+```go
+// internal/services/application_service_test.go
+package services
+
+import (
+	"context"
+	"testing"
+	"time"
+	
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/google/uuid"
+	
+	"coolify-go/internal/models"
+	"coolify-go/internal/repository"
+)
+
+// Mock repository
+type MockApplicationRepository struct {
+	mock.Mock
+}
+
+func (m *MockApplicationRepository) Create(ctx context.Context, app *models.Application) error {
+	args := m.Called(ctx, app)
+	return args.Error(0)
+}
+
+func (m *MockApplicationRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Application, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(*models.Application), args.Error(1)
+}
+
+func (m *MockApplicationRepository) GetByTeam(ctx context.Context, teamID uuid.UUID) ([]*models.Application, error) {
+	args := m.Called(ctx, teamID)
+	return args.Get(0).([]*models.Application), args.Error(1)
+}
+
+func (m *MockApplicationRepository) Update(ctx context.Context, app *models.Application) error {
+	args := m.Called(ctx, app)
+	return args.Error(0)
+}
+
+func (m *MockApplicationRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+// Test cases
+func TestApplicationService_CreateApplication(t *testing.T) {
+	tests := []struct {
+		name        string
+		request     *CreateApplicationRequest
+		setupMock   func(*MockApplicationRepository)
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "successful application creation",
+			request: &CreateApplicationRequest{
+				Name:          "test-app",
+				GitRepository: "https://github.com/user/repo.git",
+				GitBranch:     "main",
+				BuildPack:     "nodejs",
+				Port:          3000,
+				ServerID:      uuid.New().String(),
+			},
+			setupMock: func(repo *MockApplicationRepository) {
+				repo.On("Create", mock.Anything, mock.AnythingOfType("*models.Application")).Return(nil)
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid git repository",
+			request: &CreateApplicationRequest{
+				Name:          "test-app",
+				GitRepository: "invalid-url",
+				GitBranch:     "main",
+				BuildPack:     "nodejs",
+				Port:          3000,
+				ServerID:      uuid.New().String(),
+			},
+			setupMock:   func(repo *MockApplicationRepository) {},
+			expectError: true,
+			errorMsg:    "Git repository must use HTTPS",
+		},
+		{
+			name: "invalid port number",
+			request: &CreateApplicationRequest{
+				Name:          "test-app",
+				GitRepository: "https://github.com/user/repo.git",
+				GitBranch:     "main",
+				BuildPack:     "nodejs",
+				Port:          70000, // Invalid port
+				ServerID:      uuid.New().String(),
+			},
+			setupMock:   func(repo *MockApplicationRepository) {},
+			expectError: true,
+			errorMsg:    "Port must be between 1 and 65535",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			mockRepo := &MockApplicationRepository{}
+			service := NewApplicationService(mockRepo)
+			
+			tt.setupMock(mockRepo)
+			
+			// Execute
+			app, err := service.CreateApplication(context.Background(), tt.request, uuid.New())
+			
+			// Assert
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+				assert.Nil(t, app)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, app)
+				assert.Equal(t, tt.request.Name, app.Name)
+				assert.Equal(t, tt.request.GitRepository, app.GitRepository)
+				assert.Equal(t, tt.request.GitBranch, app.GitBranch)
+				assert.Equal(t, tt.request.BuildPack, app.BuildPack)
+				assert.Equal(t, tt.request.Port, app.Port)
+			}
+			
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestApplicationService_DeployApplication(t *testing.T) {
+	// Setup
+	mockRepo := &MockApplicationRepository{}
+	service := NewApplicationService(mockRepo)
+	
+	appID := uuid.New()
+	app := &models.Application{
+		BaseModel: models.BaseModel{ID: appID},
+		Name:      "test-app",
+		Status:    "stopped",
+	}
+	
+	// Expectations
+	mockRepo.On("GetByID", mock.Anything, appID).Return(app, nil)
+	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*models.Application")).Return(nil)
+	
+	// Execute
+	err := service.DeployApplication(context.Background(), appID)
+	
+	// Assert
+	assert.NoError(t, err)
+	assert.Equal(t, "deploying", app.Status)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestApplicationService_GetByTeam(t *testing.T) {
+	// Setup
+	mockRepo := &MockApplicationRepository{}
+	service := NewApplicationService(mockRepo)
+	
+	teamID := uuid.New()
+	expectedApps := []*models.Application{
+		{BaseModel: models.BaseModel{ID: uuid.New()}, Name: "app1"},
+		{BaseModel: models.BaseModel{ID: uuid.New()}, Name: "app2"},
+	}
+	
+	// Expectations
+	mockRepo.On("GetByTeam", mock.Anything, teamID).Return(expectedApps, nil)
+	
+	// Execute
+	apps, err := service.GetByTeam(context.Background(), teamID)
+	
+	// Assert
+	assert.NoError(t, err)
+	assert.Len(t, apps, 2)
+	assert.Equal(t, expectedApps, apps)
+	mockRepo.AssertExpectations(t)
+}
 ```
 
-### Service Layer Testing
-```php
-// Testing service classes
-test('configuration generator creates valid docker compose', function () {
-    $generator = new ConfigurationGenerator();
-    $application = Application::factory()->create();
-    
-    $compose = $generator->generateDockerCompose($application);
-    
-    expect($compose)->toBeString();
-    expect(yaml_parse($compose))->toBeArray();
-    expect($compose)->toContain('version: "3.8"');
-});
+#### **Server Service Tests**
+```go
+// internal/services/server_service_test.go
+func TestServerService_TestConnection(t *testing.T) {
+	tests := []struct {
+		name        string
+		serverID    uuid.UUID
+		setupMock   func(*MockServerRepository)
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:     "successful connection test",
+			serverID: uuid.New(),
+			setupMock: func(repo *MockServerRepository) {
+				server := &models.Server{
+					BaseModel: models.BaseModel{ID: uuid.New()},
+					IPAddress: "192.168.1.100",
+					Port:      22,
+					Username:  "root",
+				}
+				repo.On("GetByID", mock.Anything, mock.Anything).Return(server, nil)
+			},
+			expectError: false,
+		},
+		{
+			name:     "server not found",
+			serverID: uuid.New(),
+			setupMock: func(repo *MockServerRepository) {
+				repo.On("GetByID", mock.Anything, mock.Anything).Return(nil, repository.ErrServerNotFound)
+			},
+			expectError: true,
+			errorMsg:    "server not found",
+		},
+	}
 
-test('docker image parser validates image names', function () {
-    $parser = new DockerImageParser();
-    
-    expect($parser->isValid('nginx:latest'))->toBeTrue();
-    expect($parser->isValid('invalid-image-name'))->toBeFalse();
-    expect($parser->parse('nginx:1.21'))->toEqual([
-        'registry' => 'docker.io',
-        'namespace' => 'library',
-        'repository' => 'nginx',
-        'tag' => '1.21'
-    ]);
-});
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			mockRepo := &MockServerRepository{}
+			service := NewServerService(mockRepo)
+			
+			tt.setupMock(mockRepo)
+			
+			// Execute
+			result, err := service.TestConnection(context.Background(), tt.serverID)
+			
+			// Assert
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+				assert.Nil(t, result)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+			}
+			
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
 ```
 
-### Action Testing
-```php
-// Testing Laravel Actions
-test('deploy application action creates deployment queue', function () {
-    $application = Application::factory()->create();
-    $action = new DeployApplicationAction();
-    
-    $deployment = $action->handle($application);
-    
-    expect($deployment)->toBeInstanceOf(ApplicationDeploymentQueue::class);
-    expect($deployment->status)->toBe('queued');
-    expect($deployment->application_id)->toBe($application->id);
-});
+### **Repository Layer Testing**
 
-test('server validation action checks ssh connectivity', function () {
-    $server = Server::factory()->create([
-        'ip' => '192.168.1.100',
-        'port' => 22
-    ]);
-    
-    $action = new ValidateServerAction();
-    
-    // Mock SSH connection
-    $this->mock(SshConnection::class, function ($mock) {
-        $mock->shouldReceive('connect')->andReturn(true);
-        $mock->shouldReceive('execute')->with('docker --version')->andReturn('Docker version 20.10.0');
-    });
-    
-    $result = $action->handle($server);
-    
-    expect($result['ssh_connection'])->toBeTrue();
-    expect($result['docker_installed'])->toBeTrue();
-});
+#### **GORM Repository Tests**
+```go
+// internal/repository/application_repository_test.go
+package repository
+
+import (
+	"context"
+	"testing"
+	"time"
+	
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/google/uuid"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	
+	"coolify-go/internal/models"
+)
+
+func setupTestDB(t *testing.T) *gorm.DB {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	
+	// Auto-migrate models
+	err = db.AutoMigrate(&models.BaseModel{}, &models.Application{}, &models.Server{}, &models.Team{})
+	require.NoError(t, err)
+	
+	return db
+}
+
+func TestGORMApplicationRepository_Create(t *testing.T) {
+	// Setup
+	db := setupTestDB(t)
+	repo := NewGORMApplicationRepository(db)
+	
+	app := &models.Application{
+		Name:          "test-app",
+		GitRepository: "https://github.com/user/repo.git",
+		GitBranch:     "main",
+		BuildPack:     "nodejs",
+		Port:          3000,
+	}
+	
+	// Execute
+	err := repo.Create(context.Background(), app)
+	
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, app.ID)
+	assert.NotZero(t, app.CreatedAt)
+	assert.NotZero(t, app.UpdatedAt)
+	
+	// Verify in database
+	var found models.Application
+	err = db.First(&found, app.ID).Error
+	assert.NoError(t, err)
+	assert.Equal(t, app.Name, found.Name)
+}
+
+func TestGORMApplicationRepository_GetByID(t *testing.T) {
+	// Setup
+	db := setupTestDB(t)
+	repo := NewGORMApplicationRepository(db)
+	
+	app := &models.Application{
+		Name:          "test-app",
+		GitRepository: "https://github.com/user/repo.git",
+	}
+	
+	err := repo.Create(context.Background(), app)
+	require.NoError(t, err)
+	
+	// Execute
+	found, err := repo.GetByID(context.Background(), app.ID)
+	
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, found)
+	assert.Equal(t, app.ID, found.ID)
+	assert.Equal(t, app.Name, found.Name)
+}
+
+func TestGORMApplicationRepository_GetByTeam(t *testing.T) {
+	// Setup
+	db := setupTestDB(t)
+	repo := NewGORMApplicationRepository(db)
+	
+	teamID := uuid.New()
+	
+	// Create test data
+	apps := []*models.Application{
+		{Name: "app1", GitRepository: "https://github.com/user/repo1.git"},
+		{Name: "app2", GitRepository: "https://github.com/user/repo2.git"},
+	}
+	
+	for _, app := range apps {
+		err := repo.Create(context.Background(), app)
+		require.NoError(t, err)
+	}
+	
+	// Execute
+	found, err := repo.GetByTeam(context.Background(), teamID)
+	
+	// Assert
+	assert.NoError(t, err)
+	assert.Len(t, found, 0) // No apps belong to this team yet
+}
+
+func TestGORMApplicationRepository_Update(t *testing.T) {
+	// Setup
+	db := setupTestDB(t)
+	repo := NewGORMApplicationRepository(db)
+	
+	app := &models.Application{
+		Name:          "test-app",
+		GitRepository: "https://github.com/user/repo.git",
+	}
+	
+	err := repo.Create(context.Background(), app)
+	require.NoError(t, err)
+	
+	// Update
+	app.Name = "updated-app"
+	err = repo.Update(context.Background(), app)
+	
+	// Assert
+	assert.NoError(t, err)
+	
+	// Verify update
+	found, err := repo.GetByID(context.Background(), app.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, "updated-app", found.Name)
+}
+
+func TestGORMApplicationRepository_Delete(t *testing.T) {
+	// Setup
+	db := setupTestDB(t)
+	repo := NewGORMApplicationRepository(db)
+	
+	app := &models.Application{
+		Name:          "test-app",
+		GitRepository: "https://github.com/user/repo.git",
+	}
+	
+	err := repo.Create(context.Background(), app)
+	require.NoError(t, err)
+	
+	// Execute
+	err = repo.Delete(context.Background(), app.ID)
+	
+	// Assert
+	assert.NoError(t, err)
+	
+	// Verify deletion
+	found, err := repo.GetByID(context.Background(), app.ID)
+	assert.Error(t, err)
+	assert.Nil(t, found)
+}
 ```
 
-## Feature Testing Patterns
+### **Handler Layer Testing**
 
-### API Testing
-```php
-// Testing API endpoints
-test('authenticated user can list applications', function () {
-    $user = User::factory()->create();
-    $team = Team::factory()->create();
-    $user->teams()->attach($team);
-    
-    $applications = Application::factory(3)->create([
-        'team_id' => $team->id
-    ]);
-    
-    $response = $this->actingAs($user)
-        ->getJson('/api/v1/applications');
-    
-    $response->assertStatus(200)
-        ->assertJsonCount(3, 'data')
-        ->assertJsonStructure([
-            'data' => [
-                '*' => ['id', 'name', 'fqdn', 'status', 'created_at']
-            ]
-        ]);
-});
+#### **HTTP Handler Tests**
+```go
+// internal/handlers/application_test.go
+package handlers
 
-test('user cannot access applications from other teams', function () {
-    $user = User::factory()->create();
-    $otherTeam = Team::factory()->create();
-    
-    $application = Application::factory()->create([
-        'team_id' => $otherTeam->id
-    ]);
-    
-    $response = $this->actingAs($user)
-        ->getJson("/api/v1/applications/{$application->id}");
-    
-    $response->assertStatus(403);
-});
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/google/uuid"
+	
+	"coolify-go/internal/models"
+	"coolify-go/internal/services"
+)
+
+func setupTestRouter() *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	return gin.New()
+}
+
+func TestApplicationHandler_Create(t *testing.T) {
+	// Setup
+	router := setupTestRouter()
+	mockService := &services.MockApplicationService{}
+	handler := NewApplicationHandler(mockService)
+	
+	router.POST("/applications", handler.Create)
+	
+	tests := []struct {
+		name         string
+		requestBody  interface{}
+		setupMock    func(*services.MockApplicationService)
+		expectedCode int
+		expectedBody map[string]interface{}
+	}{
+		{
+			name: "successful application creation",
+			requestBody: map[string]interface{}{
+				"name":           "test-app",
+				"git_repository": "https://github.com/user/repo.git",
+				"git_branch":     "main",
+				"build_pack":     "nodejs",
+				"port":           3000,
+				"server_id":      uuid.New().String(),
+			},
+			setupMock: func(service *services.MockApplicationService) {
+				app := &models.Application{
+					BaseModel: models.BaseModel{ID: uuid.New()},
+					Name:      "test-app",
+				}
+				service.On("CreateApplication", mock.Anything, mock.Anything, mock.Anything).Return(app, nil)
+			},
+			expectedCode: http.StatusCreated,
+			expectedBody: map[string]interface{}{
+				"data": mock.Anything,
+			},
+		},
+		{
+			name: "invalid request data",
+			requestBody: map[string]interface{}{
+				"name": "", // Invalid empty name
+			},
+			setupMock:    func(service *services.MockApplicationService) {},
+			expectedCode: http.StatusBadRequest,
+			expectedBody: map[string]interface{}{
+				"error": "Invalid request data",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup mock
+			tt.setupMock(mockService)
+			
+			// Create request
+			body, _ := json.Marshal(tt.requestBody)
+			req := httptest.NewRequest("POST", "/applications", bytes.NewBuffer(body))
+			req.Header.Set("Content-Type", "application/json")
+			
+			// Set user in context
+			user := &models.User{BaseModel: models.BaseModel{ID: uuid.New()}}
+			req = req.WithContext(context.WithValue(req.Context(), "user", user))
+			
+			// Create response recorder
+			w := httptest.NewRecorder()
+			
+			// Execute
+			router.ServeHTTP(w, req)
+			
+			// Assert
+			assert.Equal(t, tt.expectedCode, w.Code)
+			
+			var response map[string]interface{}
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			assert.NoError(t, err)
+			
+			for key, expectedValue := range tt.expectedBody {
+				if expectedValue == mock.Anything {
+					assert.Contains(t, response, key)
+				} else {
+					assert.Equal(t, expectedValue, response[key])
+				}
+			}
+			
+			mockService.AssertExpectations(t)
+		})
+	}
+}
+
+func TestApplicationHandler_GetByID(t *testing.T) {
+	// Setup
+	router := setupTestRouter()
+	mockService := &services.MockApplicationService{}
+	handler := NewApplicationHandler(mockService)
+	
+	router.GET("/applications/:id", handler.GetByID)
+	
+	appID := uuid.New()
+	app := &models.Application{
+		BaseModel: models.BaseModel{ID: appID},
+		Name:      "test-app",
+	}
+	
+	// Setup mock
+	mockService.On("GetByID", mock.Anything, appID).Return(app, nil)
+	
+	// Create request
+	req := httptest.NewRequest("GET", "/applications/"+appID.String(), nil)
+	
+	// Set user in context
+	user := &models.User{BaseModel: models.BaseModel{ID: uuid.New()}}
+	req = req.WithContext(context.WithValue(req.Context(), "user", user))
+	
+	// Create response recorder
+	w := httptest.NewRecorder()
+	
+	// Execute
+	router.ServeHTTP(w, req)
+	
+	// Assert
+	assert.Equal(t, http.StatusOK, w.Code)
+	
+	var response map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Contains(t, response, "data")
+	
+	mockService.AssertExpectations(t)
+}
 ```
 
-### Deployment Testing
-```php
-// Testing deployment workflows
-test('application deployment creates docker containers', function () {
-    $application = Application::factory()->create([
-        'git_repository' => 'https://github.com/laravel/laravel.git',
-        'git_branch' => 'main'
-    ]);
-    
-    // Mock Docker operations
-    $this->mock(DockerService::class, function ($mock) {
-        $mock->shouldReceive('buildImage')->andReturn('app:latest');
-        $mock->shouldReceive('createContainer')->andReturn('container_id');
-        $mock->shouldReceive('startContainer')->andReturn(true);
-    });
-    
-    $deployment = $application->deploy();
-    
-    expect($deployment->status)->toBe('queued');
-    
-    // Process the deployment job
-    $this->artisan('queue:work --once');
-    
-    $deployment->refresh();
-    expect($deployment->status)->toBe('success');
-});
+## Integration Testing
 
-test('failed deployment triggers rollback', function () {
-    $application = Application::factory()->create();
-    
-    // Mock failed deployment
-    $this->mock(DockerService::class, function ($mock) {
-        $mock->shouldReceive('buildImage')->andThrow(new DeploymentException('Build failed'));
-    });
-    
-    $deployment = $application->deploy();
-    
-    $this->artisan('queue:work --once');
-    
-    $deployment->refresh();
-    expect($deployment->status)->toBe('failed');
-    expect($deployment->error_message)->toContain('Build failed');
-});
+### **API Integration Tests**
+```go
+// tests/integration/api_test.go
+package integration
+
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+	
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	
+	"coolify-go/internal/config"
+	"coolify-go/internal/models"
+	"coolify-go/internal/repository"
+	"coolify-go/internal/services"
+)
+
+func setupIntegrationTest(t *testing.T) (*gorm.DB, func()) {
+	// Start PostgreSQL container
+	ctx := context.Background()
+	req := testcontainers.ContainerRequest{
+		Image:        "postgres:15",
+		ExposedPorts: []string{"5432/tcp"},
+		Env: map[string]string{
+			"POSTGRES_DB":       "coolify_test",
+			"POSTGRES_USER":     "test",
+			"POSTGRES_PASSWORD": "test",
+		},
+		WaitingFor: wait.ForLog("database system is ready to accept connections"),
+	}
+	
+	postgresContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	require.NoError(t, err)
+	
+	// Get container host and port
+	host, err := postgresContainer.Host(ctx)
+	require.NoError(t, err)
+	
+	mappedPort, err := postgresContainer.MappedPort(ctx, "5432")
+	require.NoError(t, err)
+	
+	// Connect to database
+	dsn := fmt.Sprintf("host=%s port=%s user=test password=test dbname=coolify_test sslmode=disable",
+		host, mappedPort.Port())
+	
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	require.NoError(t, err)
+	
+	// Auto-migrate models
+	err = db.AutoMigrate(&models.BaseModel{}, &models.Application{}, &models.Server{}, &models.Team{})
+	require.NoError(t, err)
+	
+	// Cleanup function
+	cleanup := func() {
+		postgresContainer.Terminate(ctx)
+	}
+	
+	return db, cleanup
+}
+
+func TestApplicationAPI_Integration(t *testing.T) {
+	// Setup
+	db, cleanup := setupIntegrationTest(t)
+	defer cleanup()
+	
+	// Create repositories and services
+	appRepo := repository.NewGORMApplicationRepository(db)
+	appService := services.NewApplicationService(appRepo)
+	
+	// Create test server
+	server := httptest.NewServer(setupTestRouter(appService))
+	defer server.Close()
+	
+	t.Run("create and retrieve application", func(t *testing.T) {
+		// Create application via API
+		createReq := map[string]interface{}{
+			"name":           "integration-test-app",
+			"git_repository": "https://github.com/user/repo.git",
+			"git_branch":     "main",
+			"build_pack":     "nodejs",
+			"port":           3000,
+			"server_id":      uuid.New().String(),
+		}
+		
+		body, _ := json.Marshal(createReq)
+		resp, err := http.Post(server.URL+"/api/v1/applications", "application/json", bytes.NewBuffer(body))
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+		
+		// Parse response
+		var createResp map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&createResp)
+		require.NoError(t, err)
+		
+		appData := createResp["data"].(map[string]interface{})
+		appID := appData["id"].(string)
+		
+		// Retrieve application
+		resp, err = http.Get(server.URL + "/api/v1/applications/" + appID)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		
+		var getResp map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&getResp)
+		require.NoError(t, err)
+		
+		retrievedApp := getResp["data"].(map[string]interface{})
+		assert.Equal(t, "integration-test-app", retrievedApp["name"])
+	})
+}
 ```
 
-### Webhook Testing
-```php
-// Testing webhook endpoints
-test('github webhook triggers deployment', function () {
-    $application = Application::factory()->create([
-        'git_repository' => 'https://github.com/user/repo.git',
-        'git_branch' => 'main'
-    ]);
-    
-    $payload = [
-        'ref' => 'refs/heads/main',
-        'repository' => [
-            'clone_url' => 'https://github.com/user/repo.git'
-        ],
-        'head_commit' => [
-            'id' => 'abc123',
-            'message' => 'Update application'
-        ]
-    ];
-    
-    $response = $this->postJson("/webhooks/github/{$application->id}", $payload);
-    
-    $response->assertStatus(200);
-    
-    expect($application->deployments()->count())->toBe(1);
-    expect($application->deployments()->first()->commit_sha)->toBe('abc123');
-});
-
-test('webhook validates payload signature', function () {
-    $application = Application::factory()->create();
-    
-    $payload = ['invalid' => 'payload'];
-    
-    $response = $this->postJson("/webhooks/github/{$application->id}", $payload);
-    
-    $response->assertStatus(400);
-});
+### **Database Integration Tests**
+```go
+// tests/integration/database_test.go
+func TestDatabaseOperations_Integration(t *testing.T) {
+	// Setup
+	db, cleanup := setupIntegrationTest(t)
+	defer cleanup()
+	
+	appRepo := repository.NewGORMApplicationRepository(db)
+	
+	t.Run("full CRUD operations", func(t *testing.T) {
+		// Create
+		app := &models.Application{
+			Name:          "crud-test-app",
+			GitRepository: "https://github.com/user/repo.git",
+			GitBranch:     "main",
+			BuildPack:     "nodejs",
+			Port:          3000,
+		}
+		
+		err := appRepo.Create(context.Background(), app)
+		assert.NoError(t, err)
+		assert.NotNil(t, app.ID)
+		
+		// Read
+		found, err := appRepo.GetByID(context.Background(), app.ID)
+		assert.NoError(t, err)
+		assert.Equal(t, app.Name, found.Name)
+		
+		// Update
+		app.Name = "updated-crud-test-app"
+		err = appRepo.Update(context.Background(), app)
+		assert.NoError(t, err)
+		
+		// Verify update
+		found, err = appRepo.GetByID(context.Background(), app.ID)
+		assert.NoError(t, err)
+		assert.Equal(t, "updated-crud-test-app", found.Name)
+		
+		// Delete
+		err = appRepo.Delete(context.Background(), app.ID)
+		assert.NoError(t, err)
+		
+		// Verify deletion
+		found, err = appRepo.GetByID(context.Background(), app.ID)
+		assert.Error(t, err)
+		assert.Nil(t, found)
+	})
+}
 ```
 
-## Browser Testing (Laravel Dusk)
+## End-to-End Testing
 
-### End-to-End Testing
-```php
-// Testing complete user workflows
-test('user can create and deploy application', function () {
-    $user = User::factory()->create();
-    $server = Server::factory()->create(['team_id' => $user->currentTeam->id]);
-    
-    $this->browse(function (Browser $browser) use ($user, $server) {
-        $browser->loginAs($user)
-            ->visit('/applications/create')
-            ->type('name', 'Test Application')
-            ->type('git_repository', 'https://github.com/laravel/laravel.git')
-            ->type('git_branch', 'main')
-            ->select('server_id', $server->id)
-            ->press('Create Application')
-            ->assertPathIs('/applications/*')
-            ->assertSee('Test Application')
-            ->press('Deploy')
-            ->waitForText('Deployment started', 10)
-            ->assertSee('Deployment started');
-    });
-});
+### **Deployment E2E Tests**
+```go
+// tests/e2e/deployment_test.go
+package e2e
 
-test('user can monitor deployment logs in real-time', function () {
-    $user = User::factory()->create();
-    $application = Application::factory()->create(['team_id' => $user->currentTeam->id]);
-    
-    $this->browse(function (Browser $browser) use ($user, $application) {
-        $browser->loginAs($user)
-            ->visit("/applications/{$application->id}")
-            ->press('Deploy')
-            ->waitForText('Deployment started')
-            ->click('@logs-tab')
-            ->waitFor('@deployment-logs')
-            ->assertSee('Building Docker image')
-            ->waitForText('Deployment completed', 30);
-    });
-});
-```
+import (
+	"context"
+	"testing"
+	"time"
+	
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
+)
 
-### UI Component Testing
-```php
-// Testing Livewire components
-test('server status component updates in real-time', function () {
-    $user = User::factory()->create();
-    $server = Server::factory()->create(['team_id' => $user->currentTeam->id]);
-    
-    $this->browse(function (Browser $browser) use ($user, $server) {
-        $browser->loginAs($user)
-            ->visit("/servers/{$server->id}")
-            ->assertSee('Status: Online')
-            ->waitFor('@server-metrics')
-            ->assertSee('CPU Usage')
-            ->assertSee('Memory Usage')
-            ->assertSee('Disk Usage');
-        
-        // Simulate server going offline
-        $server->update(['status' => 'offline']);
-        
-        $browser->waitForText('Status: Offline', 5)
-            ->assertSee('Status: Offline');
-    });
-});
-```
-
-## Database Testing Patterns
-
-### Migration Testing
-```php
-// Testing database migrations
-test('applications table has correct structure', function () {
-    expect(Schema::hasTable('applications'))->toBeTrue();
-    expect(Schema::hasColumns('applications', [
-        'id', 'name', 'fqdn', 'git_repository', 'git_branch',
-        'server_id', 'environment_id', 'created_at', 'updated_at'
-    ]))->toBeTrue();
-});
-
-test('foreign key constraints are properly set', function () {
-    $application = Application::factory()->create();
-    
-    expect($application->server)->toBeInstanceOf(Server::class);
-    expect($application->environment)->toBeInstanceOf(Environment::class);
-    
-    // Test cascade deletion
-    $application->server->delete();
-    expect(Application::find($application->id))->toBeNull();
-});
-```
-
-### Factory Testing
-```php
-// Testing model factories
-test('application factory creates valid models', function () {
-    $application = Application::factory()->create();
-    
-    expect($application->name)->toBeString();
-    expect($application->git_repository)->toStartWith('https://');
-    expect($application->server_id)->toBeInt();
-    expect($application->environment_id)->toBeInt();
-});
-
-test('application factory can create with custom attributes', function () {
-    $application = Application::factory()->create([
-        'name' => 'Custom App',
-        'git_branch' => 'develop'
-    ]);
-    
-    expect($application->name)->toBe('Custom App');
-    expect($application->git_branch)->toBe('develop');
-});
-```
-
-## Queue Testing
-
-### Job Testing
-```php
-// Testing background jobs
-test('deploy application job processes successfully', function () {
-    $application = Application::factory()->create();
-    $deployment = ApplicationDeploymentQueue::factory()->create([
-        'application_id' => $application->id,
-        'status' => 'queued'
-    ]);
-    
-    $job = new DeployApplicationJob($deployment);
-    
-    // Mock external dependencies
-    $this->mock(DockerService::class, function ($mock) {
-        $mock->shouldReceive('buildImage')->andReturn('app:latest');
-        $mock->shouldReceive('deployContainer')->andReturn(true);
-    });
-    
-    $job->handle();
-    
-    $deployment->refresh();
-    expect($deployment->status)->toBe('success');
-});
-
-test('failed job is retried with exponential backoff', function () {
-    $application = Application::factory()->create();
-    $deployment = ApplicationDeploymentQueue::factory()->create([
-        'application_id' => $application->id
-    ]);
-    
-    $job = new DeployApplicationJob($deployment);
-    
-    // Mock failure
-    $this->mock(DockerService::class, function ($mock) {
-        $mock->shouldReceive('buildImage')->andThrow(new Exception('Network error'));
-    });
-    
-    expect(fn() => $job->handle())->toThrow(Exception::class);
-    
-    // Job should be retried
-    expect($job->tries)->toBe(3);
-    expect($job->backoff())->toBe([1, 5, 10]);
-});
-```
-
-## Security Testing
-
-### Authentication Testing
-```php
-// Testing authentication and authorization
-test('unauthenticated users cannot access protected routes', function () {
-    $response = $this->get('/dashboard');
-    $response->assertRedirect('/login');
-});
-
-test('users can only access their team resources', function () {
-    $user1 = User::factory()->create();
-    $user2 = User::factory()->create();
-    
-    $team1 = Team::factory()->create();
-    $team2 = Team::factory()->create();
-    
-    $user1->teams()->attach($team1);
-    $user2->teams()->attach($team2);
-    
-    $application = Application::factory()->create(['team_id' => $team1->id]);
-    
-    $response = $this->actingAs($user2)
-        ->get("/applications/{$application->id}");
-    
-    $response->assertStatus(403);
-});
-```
-
-### Input Validation Testing
-```php
-// Testing input validation and sanitization
-test('application creation validates required fields', function () {
-    $user = User::factory()->create();
-    
-    $response = $this->actingAs($user)
-        ->postJson('/api/v1/applications', []);
-    
-    $response->assertStatus(422)
-        ->assertJsonValidationErrors(['name', 'git_repository', 'server_id']);
-});
-
-test('malicious input is properly sanitized', function () {
-    $user = User::factory()->create();
-    
-    $response = $this->actingAs($user)
-        ->postJson('/api/v1/applications', [
-            'name' => '<script>alert("xss")</script>',
-            'git_repository' => 'javascript:alert("xss")',
-            'server_id' => 'invalid'
-        ]);
-    
-    $response->assertStatus(422);
-});
-```
-
-## Performance Testing
-
-### Load Testing
-```php
-// Testing application performance under load
-test('application list endpoint handles concurrent requests', function () {
-    $user = User::factory()->create();
-    $applications = Application::factory(100)->create(['team_id' => $user->currentTeam->id]);
-    
-    $startTime = microtime(true);
-    
-    $response = $this->actingAs($user)
-        ->getJson('/api/v1/applications');
-    
-    $endTime = microtime(true);
-    $responseTime = ($endTime - $startTime) * 1000; // Convert to milliseconds
-    
-    $response->assertStatus(200);
-    expect($responseTime)->toBeLessThan(500); // Should respond within 500ms
-});
-```
-
-### Memory Usage Testing
-```php
-// Testing memory efficiency
-test('deployment process does not exceed memory limits', function () {
-    $initialMemory = memory_get_usage();
-    
-    $application = Application::factory()->create();
-    $deployment = $application->deploy();
-    
-    // Process deployment
-    $this->artisan('queue:work --once');
-    
-    $finalMemory = memory_get_usage();
-    $memoryIncrease = $finalMemory - $initialMemory;
-    
-    expect($memoryIncrease)->toBeLessThan(50 * 1024 * 1024); // Less than 50MB
-});
+func TestApplicationDeployment_E2E(t *testing.T) {
+	// Setup test environment with Docker
+	ctx := context.Background()
+	
+	// Start test server container
+	serverReq := testcontainers.ContainerRequest{
+		Image:        "ubuntu:22.04",
+		ExposedPorts: []string{"22/tcp"},
+		Env: map[string]string{
+			"SSH_PASSWORD": "testpass",
+		},
+		WaitingFor: wait.ForLog("SSH server started"),
+	}
+	
+	serverContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: serverReq,
+		Started:          true,
+	})
+	require.NoError(t, err)
+	defer serverContainer.Terminate(ctx)
+	
+	// Start application
+	app := setupTestApplication(t)
+	defer cleanupTestApplication(t, app)
+	
+	t.Run("deploy application to test server", func(t *testing.T) {
+		// Deploy application
+		err := app.Deploy()
+		assert.NoError(t, err)
+		
+		// Wait for deployment to complete
+		err = app.WaitForDeployment(5 * time.Minute)
+		assert.NoError(t, err)
+		
+		// Verify application is running
+		status, err := app.GetStatus()
+		assert.NoError(t, err)
+		assert.Equal(t, "running", status)
+		
+		// Test application endpoint
+		resp, err := http.Get(app.GetURL())
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+}
 ```
 
 ## Test Utilities and Helpers
 
-### Custom Assertions
-```php
-// Custom test assertions
-expect()->extend('toBeValidDockerCompose', function () {
-    $yaml = yaml_parse($this->value);
-    
-    return $yaml !== false &&
-           isset($yaml['version']) &&
-           isset($yaml['services']) &&
-           is_array($yaml['services']);
-});
-
-expect()->extend('toHaveValidSshConnection', function () {
-    $server = $this->value;
-    
-    try {
-        $connection = new SshConnection($server);
-        return $connection->test();
-    } catch (Exception $e) {
-        return false;
-    }
-});
-```
-
-### Test Traits
-```php
-// Shared testing functionality
-trait CreatesTestServers
+### **Test Fixtures**
+```go
+// tests/fixtures/applications.json
 {
-    protected function createTestServer(array $attributes = []): Server
-    {
-        return Server::factory()->create(array_merge([
-            'name' => 'Test Server',
-            'ip' => '127.0.0.1',
-            'port' => 22,
-            'team_id' => $this->user->currentTeam->id
-        ], $attributes));
-    }
+	"valid_application": {
+		"name": "test-app",
+		"git_repository": "https://github.com/user/repo.git",
+		"git_branch": "main",
+		"build_pack": "nodejs",
+		"port": 3000
+	},
+	"invalid_application": {
+		"name": "",
+		"git_repository": "invalid-url",
+		"port": 70000
+	}
 }
 
-trait MocksDockerOperations
-{
-    protected function mockDockerService(): void
-    {
-        $this->mock(DockerService::class, function ($mock) {
-            $mock->shouldReceive('buildImage')->andReturn('test:latest');
-            $mock->shouldReceive('createContainer')->andReturn('container_123');
-            $mock->shouldReceive('startContainer')->andReturn(true);
-            $mock->shouldReceive('stopContainer')->andReturn(true);
-        });
-    }
+// tests/fixtures/load.go
+package fixtures
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+)
+
+func LoadFixture(name string) (map[string]interface{}, error) {
+	fixturePath := filepath.Join("tests", "fixtures", name+".json")
+	data, err := os.ReadFile(fixturePath)
+	if err != nil {
+		return nil, err
+	}
+	
+	var fixture map[string]interface{}
+	err = json.Unmarshal(data, &fixture)
+	return fixture, err
 }
 ```
 
-## Continuous Integration Testing
+### **Test Helpers**
+```go
+// tests/helpers/helpers.go
+package helpers
 
-### GitHub Actions Integration
+import (
+	"context"
+	"testing"
+	"time"
+	
+	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
+	
+	"coolify-go/internal/models"
+)
+
+func CreateTestUser(t *testing.T, db *gorm.DB) *models.User {
+	user := &models.User{
+		Name:     "Test User",
+		Email:    "test@example.com",
+		Password: "password123",
+	}
+	
+	err := db.Create(user).Error
+	require.NoError(t, err)
+	
+	return user
+}
+
+func CreateTestTeam(t *testing.T, db *gorm.DB, user *models.User) *models.Team {
+	team := &models.Team{
+		Name: "Test Team",
+		Slug: "test-team",
+	}
+	
+	err := db.Create(team).Error
+	require.NoError(t, err)
+	
+	// Add user to team
+	member := &models.TeamMember{
+		TeamID: team.ID,
+		UserID: user.ID,
+		Role:   "owner",
+	}
+	
+	err = db.Create(member).Error
+	require.NoError(t, err)
+	
+	return team
+}
+
+func CreateTestApplication(t *testing.T, db *gorm.DB, team *models.Team) *models.Application {
+	app := &models.Application{
+		Name:          "test-app",
+		GitRepository: "https://github.com/user/repo.git",
+		GitBranch:     "main",
+		BuildPack:     "nodejs",
+		Port:          3000,
+	}
+	
+	err := db.Create(app).Error
+	require.NoError(t, err)
+	
+	return app
+}
+
+func WaitForCondition(t *testing.T, condition func() bool, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	
+	for {
+		select {
+		case <-ctx.Done():
+			t.Fatal("condition not met within timeout")
+		case <-ticker.C:
+			if condition() {
+				return
+			}
+		}
+	}
+}
+```
+
+## Mock Generation
+
+### **Using Gomock**
+```go
+// Generate mocks using mockgen
+//go:generate mockgen -destination=../mocks/mock_application_repository.go -package=mocks coolify-go/internal/repository ApplicationRepository
+
+//go:generate mockgen -destination=../mocks/mock_application_service.go -package=mocks coolify-go/internal/services ApplicationService
+
+// Usage in tests
+func TestWithGeneratedMocks(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	
+	mockRepo := mocks.NewMockApplicationRepository(ctrl)
+	mockService := mocks.NewMockApplicationService(ctrl)
+	
+	// Set expectations
+	mockRepo.EXPECT().
+		Create(gomock.Any(), gomock.Any()).
+		Return(nil)
+	
+	// Use mocks in tests
+	// ...
+}
+```
+
+## Test Configuration
+
+### **Test Environment Setup**
+```go
+// tests/setup.go
+package tests
+
+import (
+	"os"
+	"testing"
+	
+	"github.com/stretchr/testify/require"
+)
+
+func TestMain(m *testing.M) {
+	// Setup test environment
+	os.Setenv("ENVIRONMENT", "test")
+	os.Setenv("LOG_LEVEL", "error")
+	
+	// Run tests
+	code := m.Run()
+	
+	// Cleanup
+	os.Exit(code)
+}
+```
+
+### **Test Configuration**
+```go
+// tests/config.go
+package tests
+
+import (
+	"github.com/stretchr/testify/require"
+	
+	"coolify-go/internal/config"
+)
+
+func LoadTestConfig() *config.Config {
+	cfg, err := config.LoadConfig()
+	require.NoError(err)
+	
+	// Override for testing
+	cfg.Database.Name = "coolify_test"
+	cfg.Logging.Level = "error"
+	
+	return cfg
+}
+```
+
+## Performance Testing
+
+### **Benchmark Tests**
+```go
+// internal/repository/application_repository_bench_test.go
+func BenchmarkApplicationRepository_Create(b *testing.B) {
+	db := setupTestDB(b)
+	repo := NewGORMApplicationRepository(db)
+	
+	b.ResetTimer()
+	
+	for i := 0; i < b.N; i++ {
+		app := &models.Application{
+			Name:          fmt.Sprintf("bench-app-%d", i),
+			GitRepository: "https://github.com/user/repo.git",
+			GitBranch:     "main",
+			BuildPack:     "nodejs",
+			Port:          3000,
+		}
+		
+		err := repo.Create(context.Background(), app)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkApplicationRepository_GetByTeam(b *testing.B) {
+	db := setupTestDB(b)
+	repo := NewGORMApplicationRepository(db)
+	
+	// Create test data
+	teamID := uuid.New()
+	for i := 0; i < 100; i++ {
+		app := &models.Application{
+			Name:          fmt.Sprintf("bench-app-%d", i),
+			GitRepository: "https://github.com/user/repo.git",
+		}
+		err := repo.Create(context.Background(), app)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	
+	b.ResetTimer()
+	
+	for i := 0; i < b.N; i++ {
+		_, err := repo.GetByTeam(context.Background(), teamID)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+```
+
+## Test Coverage
+
+### **Coverage Configuration**
+```go
+// .coveragerc
+[run]
+source = ./internal/...
+exclude = [
+	"*/mocks/*",
+	"*/testdata/*",
+	"*/fixtures/*",
+]
+
+[report]
+exclude_lines = [
+	"//go:generate",
+	"func TestMain\\(",
+	"func Benchmark",
+]
+```
+
+### **Coverage Commands**
+```bash
+# Run tests with coverage
+go test -coverprofile=coverage.out ./internal/...
+
+# Generate coverage report
+go tool cover -html=coverage.out -o coverage.html
+
+# Check coverage threshold
+go test -cover -covermode=count -coverpkg=./internal/... ./internal/...
+```
+
+## Continuous Integration
+
+### **GitHub Actions Test Workflow**
 ```yaml
-# .github/workflows/tests.yml
+# .github/workflows/test.yml
 name: Tests
+
 on: [push, pull_request]
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    
     services:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_PASSWORD: password
+          POSTGRES_DB: coolify_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: 8.4
-      - name: Install dependencies
-        run: composer install
-      - name: Run tests
-        run: ./vendor/bin/pest
-```
-
-### Test Coverage
-```php
-// Generate test coverage reports
-test('application has adequate test coverage', function () {
-    $coverage = $this->getCoverageData();
     
-    expect($coverage['application'])->toBeGreaterThan(80);
-    expect($coverage['models'])->toBeGreaterThan(90);
-    expect($coverage['actions'])->toBeGreaterThan(85);
-});
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Install dependencies
+      run: go mod download
+    
+    - name: Run linter
+      run: golangci-lint run
+    
+    - name: Run unit tests
+      run: go test -v -race -coverprofile=coverage.out ./internal/...
+    
+    - name: Run integration tests
+      run: go test -v -tags=integration ./tests/integration/...
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
 ```

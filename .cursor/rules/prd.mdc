@@ -1,0 +1,449 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Product Requirements Document (PRD)
+# Coolify Go - Open-Source Self-Hosted Application Deployment Platform
+
+## 📋 Document Information
+
+| Field | Value |
+|-------|-------|
+| **Product Name** | Coolify Go |
+| **Version** | v1.4.0 |
+| **Document Version** | 1.0 |
+| **Last Updated** | June 21, 2025 |
+| **Author** | Coolify Go Team |
+| **Status** | Development Phase |
+
+---
+
+## 🎯 Executive Summary
+
+Coolify Go is a modern, high-performance Go-based reimplementation of the popular Coolify deployment platform. It provides developers and DevOps teams with a self-hosted, open-source alternative to cloud platforms like Heroku, Netlify, and Vercel.
+
+### **Vision Statement**
+To democratize application deployment by providing a fast, reliable, and user-friendly self-hosted platform that enables teams to deploy applications with the same ease as cloud platforms, while maintaining full control over their infrastructure.
+
+### **Mission Statement**
+Empower developers to deploy applications effortlessly on their own infrastructure through an intuitive platform that combines the simplicity of PaaS with the control of self-hosting.
+
+---
+
+## 🏢 Business Context
+
+### **Market Opportunity**
+- Growing demand for self-hosted solutions due to privacy concerns and cost optimization
+- Developer preference for cloud-like deployment experiences without vendor lock-in
+- Need for lightweight, performant alternatives to existing PHP-based solutions
+- Rising costs of cloud platforms driving companies to seek self-hosted alternatives
+
+### **Target Market**
+- **Primary**: Small to medium development teams (5-50 developers)
+- **Secondary**: Individual developers and freelancers
+- **Tertiary**: Large enterprises seeking private cloud solutions
+
+### **Competitive Landscape**
+- **Direct Competitors**: Original Coolify (PHP), CapRover, Dokku
+- **Indirect Competitors**: Heroku, Netlify, Vercel, Railway
+- **Advantages**: Go performance, modern architecture, container-native design
+
+---
+
+## 👥 Target Users & Personas
+
+### **Primary Persona: DevOps Engineer (Sarah)**
+- **Role**: Senior DevOps Engineer at a 20-person startup
+- **Goals**: Reduce deployment complexity, maintain infrastructure control, optimize costs
+- **Pain Points**: Complex deployment pipelines, high cloud costs, vendor lock-in
+- **Usage**: Manages 10-15 applications, needs reliable CI/CD, wants infrastructure visibility
+
+### **Secondary Persona: Full-Stack Developer (Mike)**
+- **Role**: Lead Developer at a consultancy
+- **Goals**: Fast deployment for client projects, simple setup, reliable hosting
+- **Pain Points**: Complex server management, time-consuming deployments
+- **Usage**: Deploys 5-10 client applications monthly, needs quick setup and teardown
+
+### **Tertiary Persona: Startup CTO (Alex)**
+- **Role**: Technical founder of a growing startup
+- **Goals**: Cost-effective scaling, team productivity, infrastructure reliability
+- **Pain Points**: Budget constraints, need for development velocity
+- **Usage**: Oversees platform strategy, needs cost predictability and team efficiency
+
+---
+
+## 🎯 Product Objectives
+
+### **Primary Objectives (Year 1)**
+1. **Performance**: Achieve 50% faster deployment times compared to PHP Coolify
+2. **Adoption**: Reach 1,000 active installations within 12 months
+3. **Reliability**: Maintain 99.9% uptime for core platform services
+4. **User Experience**: Achieve sub-3-minute setup time for new users
+
+### **Secondary Objectives**
+1. **Community**: Build active community of 500+ contributors
+2. **Ecosystem**: Support 20+ popular application frameworks
+3. **Documentation**: Comprehensive guides covering all use cases
+4. **Enterprise**: Develop enterprise features for larger deployments
+
+---
+
+## ✨ Core Value Propositions
+
+### **1. Performance First**
+- Built with Go for superior performance and resource efficiency
+- 50% faster deployments compared to existing solutions
+- Lower memory footprint and CPU usage
+
+### **2. Developer Experience**
+- One-line installation: `curl -fsSL https://install.coolify.io | bash`
+- Intuitive web interface with real-time feedback
+- Comprehensive CLI tools for automation
+
+### **3. Container Native**
+- Built for Docker and Kubernetes from the ground up
+- Automatic containerization of applications
+- Advanced container orchestration features
+
+### **4. Self-Hosted Freedom**
+- Complete control over data and infrastructure
+- No vendor lock-in or usage limits
+- Transparent pricing (infrastructure costs only)
+
+### **5. Enterprise Ready**
+- Multi-tenant architecture with team isolation
+- SSO integration and advanced authentication
+- Audit trails and compliance features
+
+---
+
+## 🏗️ Product Architecture
+
+### **Current Implementation (v1.4.0)**
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Coolify Go v1.4.0                       │
+├─────────────────────────────────────────────────────────────┤
+│  Frontend: Basic HTML/CSS/JS (Minimal UI)                  │
+├─────────────────────────────────────────────────────────────┤
+│  Backend: Go HTTP Server                                   │
+│  - Health endpoints (/health, /version)                    │
+│  - Basic configuration management                          │
+│  - Database connectivity (PostgreSQL)                      │
+├─────────────────────────────────────────────────────────────┤
+│  Infrastructure:                                           │
+│  - PostgreSQL 15 (Data persistence)                        │
+│  - Redis 7 (Caching & queuing)                            │
+│  - Docker (Containerization)                               │
+│  - Azure Container Registry (Image distribution)           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### **Target Architecture (Future Versions)**
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Coolify Go (Target)                      │
+├─────────────────────────────────────────────────────────────┤
+│  Frontend: React/Vue SPA + Real-time updates              │
+├─────────────────────────────────────────────────────────────┤
+│  API Layer: REST + GraphQL + WebSocket                     │
+├─────────────────────────────────────────────────────────────┤
+│  Business Logic:                                           │
+│  - Application Management                                   │
+│  - Deployment Engine                                        │
+│  - Server Management                                        │
+│  - User & Team Management                                   │
+├─────────────────────────────────────────────────────────────┤
+│  Infrastructure Services:                                  │
+│  - Git Integration                                          │
+│  - Docker Orchestration                                     │
+│  - SSH Management                                           │
+│  - Reverse Proxy (Traefik)                                 │
+│  - SSL Management                                           │
+├─────────────────────────────────────────────────────────────┤
+│  Data Layer: PostgreSQL + Redis + File Storage             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🚀 Feature Roadmap
+
+### **Phase 1: Foundation (Months 1-3) - CURRENT**
+- ✅ Basic Go HTTP server
+- ✅ Health monitoring and status endpoints
+- ✅ Database connectivity (PostgreSQL + Redis)
+- ✅ Docker containerization
+- ✅ CI/CD pipeline with Azure Container Registry
+- ✅ One-line installation script
+- ✅ Multi-platform support (Linux, macOS, Windows)
+
+### **Phase 2: Core Platform (Months 4-6)**
+- 🔄 User authentication and authorization
+- 🔄 Basic web interface (admin dashboard)
+- 🔄 Application lifecycle management (CRUD)
+- 🔄 Docker integration for application deployment
+- 🔄 Basic server management
+- 🔄 Git repository integration
+
+### **Phase 3: Deployment Engine (Months 7-9)**
+- 🔄 Automatic application detection and building
+- 🔄 Environment variable management
+- 🔄 Domain and SSL certificate management
+- 🔄 Real-time deployment logs
+- 🔄 Rollback functionality
+- 🔄 Health checks and monitoring
+
+### **Phase 4: Advanced Features (Months 10-12)**
+- 🔄 Multi-server management
+- 🔄 Load balancing and scaling
+- 🔄 Backup and restore functionality
+- 🔄 Team management and permissions
+- 🔄 Webhook integrations
+- 🔄 Monitoring and alerting
+
+### **Phase 5: Enterprise Features (Year 2)**
+- 🔄 SSO integration (SAML, OAuth)
+- 🔄 Advanced audit logging
+- 🔄 API rate limiting and quotas
+- 🔄 Multi-tenant isolation
+- 🔄 Enterprise support and SLA
+
+---
+
+## 📊 Success Metrics & KPIs
+
+### **Technical Metrics**
+| Metric | Current | Target (6 months) | Target (12 months) |
+|--------|---------|-------------------|-------------------|
+| **Deployment Time** | N/A | < 2 minutes | < 1 minute |
+| **Memory Usage** | ~50MB | < 100MB | < 150MB |
+| **CPU Usage (idle)** | ~1% | < 5% | < 5% |
+| **Startup Time** | ~3 seconds | < 5 seconds | < 3 seconds |
+| **API Response Time** | ~100ms | < 200ms | < 100ms |
+
+### **Business Metrics**
+| Metric | Current | Target (6 months) | Target (12 months) |
+|--------|---------|-------------------|-------------------|
+| **Active Installations** | ~10 | 100 | 1,000 |
+| **GitHub Stars** | ~50 | 500 | 2,000 |
+| **Community Contributors** | 2 | 25 | 100 |
+| **Applications Deployed** | 0 | 1,000 | 10,000 |
+| **Documentation Pages** | 15 | 50 | 100 |
+
+### **User Experience Metrics**
+| Metric | Current | Target (6 months) | Target (12 months) |
+|--------|---------|-------------------|-------------------|
+| **Setup Time** | ~5 minutes | < 3 minutes | < 2 minutes |
+| **User Onboarding** | Manual | Guided tutorial | Interactive guide |
+| **Documentation Score** | 6/10 | 8/10 | 9/10 |
+| **User Satisfaction** | N/A | 4.0/5.0 | 4.5/5.0 |
+
+---
+
+## 🎨 User Experience Requirements
+
+### **Installation Experience**
+- **Requirement**: Single command installation
+- **Current**: `curl -fsSL https://install.coolify.io | bash`
+- **Success Criteria**: 95% of users complete installation without issues
+
+### **First-Time User Experience**
+- **Requirement**: Complete onboarding within 5 minutes
+- **Flow**: Installation → Setup wizard → First deployment
+- **Success Criteria**: 80% of users deploy their first application within 10 minutes
+
+### **Daily Usage Experience**
+- **Requirement**: Intuitive dashboard with real-time updates
+- **Features**: Application overview, deployment status, logs, metrics
+- **Success Criteria**: Users can perform common tasks without documentation
+
+### **Mobile Experience**
+- **Requirement**: Responsive design for mobile monitoring
+- **Scope**: View applications, check status, access logs
+- **Success Criteria**: Core features accessible on mobile devices
+
+---
+
+## 🔧 Technical Requirements
+
+### **Performance Requirements**
+- **Response Time**: API endpoints must respond within 200ms for 95% of requests
+- **Throughput**: Support 100 concurrent deployments
+- **Resource Usage**: Maximum 512MB RAM for core platform
+- **Scalability**: Handle 1,000 applications per instance
+
+### **Security Requirements**
+- **Authentication**: Multi-factor authentication support
+- **Authorization**: Role-based access control (RBAC)
+- **Data Encryption**: TLS 1.3 for all communications
+- **Container Security**: Image vulnerability scanning
+- **Audit Logging**: Complete audit trail for all operations
+
+### **Reliability Requirements**
+- **Uptime**: 99.9% availability for core services
+- **Data Durability**: 99.999% data durability with automated backups
+- **Disaster Recovery**: Complete system recovery within 1 hour
+- **Monitoring**: Comprehensive health checks and alerting
+
+### **Compatibility Requirements**
+- **Operating Systems**: Linux (Ubuntu, Debian, CentOS, RHEL), macOS, Windows
+- **Architectures**: AMD64, ARM64
+- **Container Platforms**: Docker, Podman, containerd
+- **Cloud Providers**: AWS, GCP, Azure, DigitalOcean, Hetzner
+
+---
+
+## 🌍 Deployment & Distribution
+
+### **Distribution Strategy**
+1. **Open Source First**: Primary distribution via GitHub
+2. **Package Managers**: Homebrew, APT, YUM, Chocolatey
+3. **Container Registries**: Docker Hub, GitHub Container Registry, Azure ACR
+4. **Cloud Marketplaces**: AWS Marketplace, DigitalOcean Marketplace
+
+### **Installation Methods**
+1. **One-line script**: Primary method for VPS deployment
+2. **Docker Compose**: For development and testing
+3. **Kubernetes Helm**: For cluster deployments
+4. **Binary downloads**: For manual installations
+
+### **Update Strategy**
+- **Automatic Updates**: Optional automatic update system
+- **Rolling Updates**: Zero-downtime updates for critical components
+- **Rollback Support**: One-click rollback to previous versions
+- **Notification System**: Email/webhook notifications for available updates
+
+---
+
+## 📈 Go-to-Market Strategy
+
+### **Phase 1: Developer Community (Months 1-6)**
+- **Target**: Individual developers and small teams
+- **Channels**: GitHub, Reddit, Hacker News, Dev.to
+- **Messaging**: "Self-hosted Heroku alternative in Go"
+- **Content**: Technical blogs, video tutorials, open-source advocacy
+
+### **Phase 2: DevOps Community (Months 7-12)**
+- **Target**: DevOps engineers and platform teams
+- **Channels**: DevOps conferences, Kubernetes community, CNCF
+- **Messaging**: "Container-native deployment platform"
+- **Content**: Case studies, performance benchmarks, integration guides
+
+### **Phase 3: Enterprise (Year 2+)**
+- **Target**: Mid-market and enterprise companies
+- **Channels**: Direct sales, partner networks, industry events
+- **Messaging**: "Enterprise-ready self-hosted PaaS"
+- **Content**: Whitepapers, ROI calculators, compliance documentation
+
+---
+
+## 🎯 Pricing Strategy
+
+### **Open Source (Free)**
+- Core platform features
+- Community support
+- MIT license
+- Self-deployment required
+
+### **Cloud Hosted (Future)**
+- **Starter**: $29/month - Up to 5 applications
+- **Professional**: $99/month - Up to 25 applications + advanced features
+- **Enterprise**: Custom pricing - Unlimited applications + dedicated support
+
+### **Enterprise License (Future)**
+- **Self-hosted**: $500/month per 100 applications
+- **Support**: 24/7 enterprise support
+- **Features**: SSO, audit logs, compliance tools
+- **SLA**: 99.95% uptime guarantee
+
+---
+
+## 🔮 Future Considerations
+
+### **Integration Ecosystem**
+- **CI/CD**: GitHub Actions, GitLab CI, Jenkins
+- **Monitoring**: Prometheus, Grafana, DataDog
+- **Logging**: ELK Stack, Fluentd, Loki
+- **Security**: Vault, SOPS, external secret management
+
+### **Platform Extensions**
+- **Marketplace**: Community-contributed application templates
+- **Plugins**: Custom deployment strategies and integrations
+- **APIs**: Comprehensive REST and GraphQL APIs
+- **SDKs**: Client libraries for popular programming languages
+
+### **Advanced Features**
+- **Multi-cloud**: Deploy across multiple cloud providers
+- **Edge Computing**: Deploy to edge locations
+- **Serverless**: Support for serverless deployments
+- **Machine Learning**: MLOps capabilities for ML model deployment
+
+---
+
+## ✅ Acceptance Criteria
+
+### **Minimum Viable Product (MVP)**
+- [ ] User can install Coolify Go with one command
+- [ ] User can create and manage user accounts
+- [ ] User can connect Git repositories
+- [ ] User can deploy simple web applications
+- [ ] User can view application logs and status
+- [ ] User can manage environment variables
+- [ ] User can access applications via custom domains
+
+### **Version 1.0 Release Criteria**
+- [ ] All MVP features implemented and tested
+- [ ] Comprehensive documentation available
+- [ ] Security audit completed
+- [ ] Performance benchmarks meet targets
+- [ ] Multi-platform compatibility verified
+- [ ] Community feedback incorporated
+- [ ] Automated testing coverage > 80%
+
+---
+
+## 📋 Risk Assessment
+
+### **Technical Risks**
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| **Performance Issues** | Medium | High | Continuous benchmarking, performance monitoring |
+| **Security Vulnerabilities** | Medium | High | Regular security audits, dependency scanning |
+| **Scaling Limitations** | Low | Medium | Load testing, architectural reviews |
+| **Container Platform Changes** | Low | Medium | Multiple container runtime support |
+
+### **Business Risks**
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| **Limited Adoption** | Medium | High | Strong community engagement, clear value proposition |
+| **Competitor Response** | High | Medium | Continuous innovation, feature differentiation |
+| **Resource Constraints** | Medium | Medium | Phased development, community contributions |
+| **Market Saturation** | Low | High | Focus on unique value propositions |
+
+---
+
+## 📞 Stakeholder Communication
+
+### **Internal Stakeholders**
+- **Development Team**: Weekly sprint reviews, technical architecture discussions
+- **Product Owner**: Bi-weekly product planning, roadmap updates
+- **Community Manager**: Monthly community metrics, feedback summary
+
+### **External Stakeholders**
+- **Users**: Monthly newsletter, feature announcements, feedback surveys
+- **Contributors**: Quarterly contributor meetings, recognition programs
+- **Partners**: Quarterly business reviews, integration planning
+
+### **Communication Channels**
+- **Documentation**: Comprehensive docs site with tutorials and API reference
+- **Community**: Discord server, GitHub discussions, Reddit community
+- **Updates**: Blog posts, changelog, social media announcements
+- **Support**: GitHub issues, community forum, email support
+
+---
+
+**Document Status**: Living document, updated monthly  
+**Next Review**: July 21, 2025  
+**Approval**: Pending stakeholder review

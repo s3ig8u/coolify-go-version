@@ -1,65 +1,61 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: false
 ---
-# Coolify Technology Stack
+# Coolify Go Technology Stack
 
 ## Backend Framework
 
-### **Laravel 12.4.1** (PHP Framework)
-- **Location**: [composer.json](mdc:composer.json)
-- **Purpose**: Core application framework
+### **Go 1.21+** (Core Language)
+- **Location**: [go.mod](mdc:go-src/go.mod)
+- **Purpose**: High-performance backend implementation
 - **Key Features**: 
-  - Eloquent ORM for database interactions
-  - Artisan CLI for development tasks
-  - Queue system for background jobs
-  - Event-driven architecture
+  - Strong typing and compile-time safety
+  - Concurrent programming with goroutines
+  - Built-in HTTP server capabilities
+  - Cross-platform compilation
 
-### **PHP 8.4**
-- **Requirement**: `^8.4` in [composer.json](mdc:composer.json)
-- **Features Used**:
-  - Typed properties and return types
-  - Attributes for validation and configuration
-  - Match expressions
-  - Constructor property promotion
+### **HTTP Framework Options**
+- **Gin** - High-performance HTTP web framework
+- **Echo** - Fast and minimalist web framework
+- **Gorilla Mux** - Powerful HTTP router and URL matcher
+- **Chi** - Lightweight, expressive HTTP router
 
 ## Frontend Stack
 
-### **Livewire 3.5.20** (Primary Frontend Framework)
-- **Purpose**: Server-side rendering with reactive components
-- **Location**: [app/Livewire/](mdc:app/Livewire/)
-- **Key Components**:
-  - [Dashboard.php](mdc:app/Livewire/Dashboard.php) - Main interface
-  - [ActivityMonitor.php](mdc:app/Livewire/ActivityMonitor.php) - Real-time monitoring
-  - [MonacoEditor.php](mdc:app/Livewire/MonacoEditor.php) - Code editor
+### **Template Engine** (Server-Side Rendering)
+- **Purpose**: Server-side HTML generation
+- **Options**: 
+  - `html/template` - Go's built-in template engine
+  - `github.com/valyala/quicktemplate` - Fast template engine
+  - `github.com/yuin/goldmark` - Markdown rendering
 
-### **Alpine.js** (Client-Side Interactivity)
-- **Purpose**: Lightweight JavaScript for DOM manipulation
-- **Integration**: Works seamlessly with Livewire components
-- **Usage**: Declarative directives in Blade templates
+### **JavaScript Integration**
+- **Purpose**: Client-side interactivity
+- **Options**:
+  - Vanilla JavaScript with Alpine.js-like patterns
+  - HTMX for dynamic content updates
+  - WebSocket for real-time features
 
-### **Tailwind CSS 4.1.4** (Styling Framework)
-- **Location**: [package.json](mdc:package.json)
-- **Configuration**: [postcss.config.cjs](mdc:postcss.config.cjs)
+### **CSS Framework**
+- **Tailwind CSS** - Utility-first CSS framework
+- **Configuration**: PostCSS with Tailwind
 - **Extensions**:
   - `@tailwindcss/forms` - Form styling
   - `@tailwindcss/typography` - Content typography
   - `tailwind-scrollbar` - Custom scrollbars
 
-### **Vue.js 3.5.13** (Component Framework)
-- **Purpose**: Enhanced interactive components
-- **Integration**: Used alongside Livewire for complex UI
-- **Build Tool**: Vite with Vue plugin
-
 ## Database & Caching
 
 ### **PostgreSQL 15** (Primary Database)
+- **Driver**: `github.com/lib/pq` or `github.com/jackc/pgx/v5`
+- **ORM**: GORM (`gorm.io/gorm`) or SQLx (`github.com/jmoiron/sqlx`)
 - **Purpose**: Main application data storage
-- **Features**: JSONB support, advanced indexing
-- **Models**: [app/Models/](mdc:app/Models/)
+- **Features**: JSONB support, advanced indexing, transactions
 
 ### **Redis 7** (Caching & Real-time)
+- **Driver**: `github.com/go-redis/redis/v8` or `github.com/redis/go-redis/v9`
 - **Purpose**: 
   - Session storage
   - Queue backend
@@ -67,59 +63,84 @@ alwaysApply: false
   - WebSocket session management
 
 ### **Supported Databases** (For User Applications)
-- **PostgreSQL**: [StandalonePostgresql.php](mdc:app/Models/StandalonePostgresql.php)
-- **MySQL**: [StandaloneMysql.php](mdc:app/Models/StandaloneMysql.php)
-- **MariaDB**: [StandaloneMariadb.php](mdc:app/Models/StandaloneMariadb.php)
-- **MongoDB**: [StandaloneMongodb.php](mdc:app/Models/StandaloneMongodb.php)
-- **Redis**: [StandaloneRedis.php](mdc:app/Models/StandaloneRedis.php)
-- **KeyDB**: [StandaloneKeydb.php](mdc:app/Models/StandaloneKeydb.php)
-- **Dragonfly**: [StandaloneDragonfly.php](mdc:app/Models/StandaloneDragonfly.php)
-- **ClickHouse**: [StandaloneClickhouse.php](mdc:app/Models/StandaloneClickhouse.php)
+- **PostgreSQL**: Standalone PostgreSQL instances
+- **MySQL**: Standalone MySQL instances
+- **MariaDB**: Standalone MariaDB instances
+- **MongoDB**: Standalone MongoDB instances
+- **Redis**: Standalone Redis instances
+- **KeyDB**: Standalone KeyDB instances
+- **Dragonfly**: Standalone Dragonfly instances
+- **ClickHouse**: Standalone ClickHouse instances
 
 ## Authentication & Security
 
-### **Laravel Sanctum 4.0.8**
-- **Purpose**: API token authentication
-- **Usage**: Secure API access for external integrations
+### **JWT Authentication**
+- **Package**: `github.com/golang-jwt/jwt/v4`
+- **Purpose**: Stateless API authentication
+- **Features**: Token-based authentication, refresh tokens
 
-### **Laravel Fortify 1.25.4**
-- **Purpose**: Authentication scaffolding
-- **Features**: Login, registration, password reset
-
-### **Laravel Socialite 5.18.0**
+### **OAuth Integration**
+- **Package**: `golang.org/x/oauth2`
 - **Purpose**: OAuth provider integration
 - **Providers**:
   - GitHub, GitLab, Google
   - Microsoft Azure, Authentik
   - Custom OAuth implementations
 
-## Background Processing
+### **Password Hashing**
+- **Package**: `golang.org/x/crypto/bcrypt`
+- **Purpose**: Secure password storage
+- **Features**: Adaptive hashing, salt generation
 
-### **Laravel Horizon 5.30.3**
-- **Purpose**: Queue monitoring and management
-- **Features**: Real-time queue metrics, failed job handling
+## Background Processing
 
 ### **Queue System**
 - **Backend**: Redis-based queues
-- **Jobs**: [app/Jobs/](mdc:app/Jobs/)
+- **Worker**: Custom goroutine-based workers
 - **Processing**: Background deployment and monitoring tasks
+- **Packages**: `github.com/hibiken/asynq` or custom implementation
+
+### **Job Processing**
+```go
+// Example job structure
+type DeploymentJob struct {
+    ApplicationID string    `json:"application_id"`
+    TriggeredBy   string    `json:"triggered_by"`
+    GitCommitHash string    `json:"git_commit_hash"`
+    Force         bool      `json:"force"`
+    CreatedAt     time.Time `json:"created_at"`
+}
+
+// Job processor
+type JobProcessor struct {
+    redis *redis.Client
+    db    *gorm.DB
+}
+
+func (jp *JobProcessor) ProcessDeployment(job *DeploymentJob) error {
+    // Background deployment logic
+    return nil
+}
+```
 
 ## Development Tools
 
 ### **Build Tools**
-- **Vite 6.2.6**: Modern build tool and dev server
-- **Laravel Vite Plugin**: Laravel integration
-- **PostCSS**: CSS processing pipeline
+- **Go Modules**: Dependency management
+- **Air**: Live reload for development
+- **Task**: Task runner for build automation
 
 ### **Code Quality**
-- **Laravel Pint**: PHP code style fixer
-- **Rector**: PHP automated refactoring
-- **PHPStan**: Static analysis tool
+- **golangci-lint**: Comprehensive linter
+- **go fmt**: Code formatting
+- **go vet**: Static analysis
+- **go test**: Unit testing framework
 
 ### **Testing Framework**
-- **Pest 3.8.0**: Modern PHP testing framework
-- **Laravel Dusk**: Browser automation testing
-- **PHPUnit**: Unit testing foundation
+- **Go Testing**: Built-in testing framework
+- **Testify**: Testing utilities and assertions
+- **Gomock**: Mock generation
+- **Testcontainers**: Integration testing with containers
 
 ## External Integrations
 
@@ -130,26 +151,26 @@ alwaysApply: false
 - **Gitea**: Self-hosted Git service
 
 ### **Cloud Storage**
-- **AWS S3**: [league/flysystem-aws-s3-v3](mdc:composer.json)
-- **SFTP**: [league/flysystem-sftp-v3](mdc:composer.json)
+- **AWS S3**: `github.com/aws/aws-sdk-go-v2`
+- **SFTP**: `github.com/pkg/sftp`
 - **Local Storage**: File system integration
 
 ### **Notification Services**
-- **Email**: [resend/resend-laravel](mdc:composer.json)
+- **Email**: `github.com/go-gomail/gomail`
 - **Discord**: Custom webhook integration
 - **Slack**: Webhook notifications
 - **Telegram**: Bot API integration
 - **Pushover**: Push notifications
 
 ### **Monitoring & Logging**
-- **Sentry**: [sentry/sentry-laravel](mdc:composer.json) - Error tracking
-- **Laravel Ray**: [spatie/laravel-ray](mdc:composer.json) - Debug tool
-- **Activity Log**: [spatie/laravel-activitylog](mdc:composer.json)
+- **Sentry**: `github.com/getsentry/sentry-go` - Error tracking
+- **Zap**: `go.uber.org/zap` - Structured logging
+- **Prometheus**: `github.com/prometheus/client_golang` - Metrics
 
 ## DevOps & Infrastructure
 
 ### **Docker & Containerization**
-- **Docker**: Container runtime
+- **Docker**: `github.com/docker/docker/client` - Container runtime
 - **Docker Compose**: Multi-container orchestration
 - **Docker Swarm**: Container clustering (optional)
 
@@ -159,7 +180,7 @@ alwaysApply: false
 - **Caddy**: Alternative reverse proxy
 
 ### **Process Management**
-- **S6 Overlay**: Process supervisor
+- **Systemd**: Process supervisor
 - **Supervisor**: Alternative process manager
 
 ### **SSL/TLS**
@@ -168,12 +189,12 @@ alwaysApply: false
 
 ## Terminal & Code Editing
 
-### **XTerm.js 5.5.0**
+### **XTerm.js Integration**
 - **Purpose**: Web-based terminal emulator
 - **Features**: SSH session management, real-time command execution
-- **Addons**: Fit addon for responsive terminals
+- **Integration**: WebSocket-based terminal communication
 
-### **Monaco Editor**
+### **Code Editor**
 - **Purpose**: Code editor component
 - **Features**: Syntax highlighting, auto-completion
 - **Integration**: Environment variable editing, configuration files
@@ -181,70 +202,96 @@ alwaysApply: false
 ## API & Documentation
 
 ### **OpenAPI/Swagger**
-- **Documentation**: [openapi.json](mdc:openapi.json) (373KB)
-- **Generator**: [zircote/swagger-php](mdc:composer.json)
-- **API Routes**: [routes/api.php](mdc:routes/api.php)
+- **Documentation**: OpenAPI 3.0 specification
+- **Generator**: `github.com/swaggo/swag`
+- **API Routes**: RESTful API endpoints
 
 ### **WebSocket Communication**
-- **Laravel Echo**: Real-time event broadcasting
-- **Pusher**: WebSocket service integration
-- **Soketi**: Self-hosted WebSocket server
+- **Gorilla WebSocket**: `github.com/gorilla/websocket`
+- **Real-time Updates**: Live deployment status, logs, monitoring
 
 ## Package Management
 
-### **PHP Dependencies** ([composer.json](mdc:composer.json))
-```json
-{
-  "require": {
-    "php": "^8.4",
-    "laravel/framework": "12.4.1",
-    "livewire/livewire": "^3.5.20",
-    "spatie/laravel-data": "^4.13.1",
-    "lorisleiva/laravel-actions": "^2.8.6"
-  }
+### **Go Dependencies** ([go.mod](mdc:go-src/go.mod))
+```go
+module coolify-go
+
+go 1.21
+
+require (
+    github.com/gin-gonic/gin v1.9.1
+    github.com/go-redis/redis/v8 v8.11.5
+    github.com/golang-jwt/jwt/v4 v4.5.0
+    github.com/lib/pq v1.10.9
+    gorm.io/gorm v1.25.5
+    gorm.io/driver/postgres v1.5.4
+    github.com/docker/docker v24.0.7
+    golang.org/x/crypto v0.17.0
+    golang.org/x/oauth2 v0.15.0
+)
+```
+
+## Architecture Patterns
+
+### **Clean Architecture**
+```
+├── cmd/                    # Application entry points
+├── internal/               # Private application code
+│   ├── auth/              # Authentication logic
+│   ├── models/            # Data models
+│   ├── handlers/          # HTTP handlers
+│   ├── services/          # Business logic
+│   └── repository/        # Data access layer
+├── pkg/                   # Public packages
+├── web/                   # Static assets and templates
+└── migrations/            # Database migrations
+```
+
+### **Dependency Injection**
+```go
+// Service container pattern
+type Container struct {
+    DB          *gorm.DB
+    Redis       *redis.Client
+    AuthService *AuthService
+    UserService *UserService
+}
+
+// Dependency injection
+func NewContainer(config *Config) *Container {
+    db := initDatabase(config)
+    redis := initRedis(config)
+    
+    return &Container{
+        DB:          db,
+        Redis:       redis,
+        AuthService: NewAuthService(db, redis),
+        UserService: NewUserService(db),
+    }
 }
 ```
 
-### **JavaScript Dependencies** ([package.json](mdc:package.json))
-```json
-{
-  "devDependencies": {
-    "vite": "^6.2.6",
-    "tailwindcss": "^4.1.4",
-    "@vitejs/plugin-vue": "5.2.3"
-  },
-  "dependencies": {
-    "@xterm/xterm": "^5.5.0",
-    "ioredis": "5.6.0"
-  }
+### **Middleware Pattern**
+```go
+// HTTP middleware
+func AuthMiddleware(authService *AuthService) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        token := c.GetHeader("Authorization")
+        if token == "" {
+            c.JSON(401, gin.H{"error": "Unauthorized"})
+            c.Abort()
+            return
+        }
+        
+        user, err := authService.ValidateToken(token)
+        if err != nil {
+            c.JSON(401, gin.H{"error": "Invalid token"})
+            c.Abort()
+            return
+        }
+        
+        c.Set("user", user)
+        c.Next()
+    }
 }
 ```
-
-## Configuration Files
-
-### **Build Configuration**
-- **[vite.config.js](mdc:vite.config.js)**: Frontend build setup
-- **[postcss.config.cjs](mdc:postcss.config.cjs)**: CSS processing
-- **[rector.php](mdc:rector.php)**: PHP refactoring rules
-- **[pint.json](mdc:pint.json)**: Code style configuration
-
-### **Testing Configuration**
-- **[phpunit.xml](mdc:phpunit.xml)**: Unit test configuration
-- **[phpunit.dusk.xml](mdc:phpunit.dusk.xml)**: Browser test configuration
-- **[tests/Pest.php](mdc:tests/Pest.php)**: Pest testing setup
-
-## Version Requirements
-
-### **Minimum Requirements**
-- **PHP**: 8.4+
-- **Node.js**: 18+ (for build tools)
-- **PostgreSQL**: 15+
-- **Redis**: 7+
-- **Docker**: 20.10+
-- **Docker Compose**: 2.0+
-
-### **Recommended Versions**
-- **Ubuntu**: 22.04 LTS or 24.04 LTS
-- **Memory**: 2GB+ RAM
-- **Storage**: 20GB+ available space
-- **Network**: Stable internet connection for deployments
