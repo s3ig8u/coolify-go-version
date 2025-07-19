@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Coolify Go</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="h-full" x-data="{ sidebarOpen: false, darkMode: false }">
+    <!-- Sidebar -->
+    <div class="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out" 
+         :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+         x-show="sidebarOpen" 
+         x-cloak>
+        <div class="flex items-center justify-between h-16 px-6 border-b border-gray-200">
+            <div class="flex items-center">
+                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-cloud text-white text-sm"></i>
+                </div>
+                <span class="ml-3 text-lg font-semibold text-gray-900">Coolify Go</span>
+            </div>
+            <button @click="sidebarOpen = false" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <nav class="mt-6 px-3">
+            <div class="space-y-1">
+                <a href="/dashboard" class="group flex items-center px-3 py-2 text-sm font-medium rounded-md {{if eq .ActivePage "dashboard"}}bg-blue-100 text-blue-700{{else}}text-gray-700 hover:bg-gray-50 hover:text-gray-900{{end}}">
+                    <i class="fas fa-tachometer-alt mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                    Dashboard
+                </a>
+                <a href="/applications" class="group flex items-center px-3 py-2 text-sm font-medium rounded-md {{if eq .ActivePage "applications"}}bg-blue-100 text-blue-700{{else}}text-gray-700 hover:bg-gray-50 hover:text-gray-900{{end}}">
+                    <i class="fas fa-cube mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                    Applications
+                </a>
+                <a href="/servers" class="group flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-50 hover:text-gray-900">
+                    <i class="fas fa-server mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                    Servers
+                </a>
+                <a href="/teams" class="group flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-50 hover:text-gray-900">
+                    <i class="fas fa-users mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                    Teams
+                </a>
+                <a href="/settings" class="group flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-50 hover:text-gray-900">
+                    <i class="fas fa-cog mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                    Settings
+                </a>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Main content -->
+    <div class="lg:pl-64">
+        <!-- Top navigation -->
+        <div class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
+            <button @click="sidebarOpen = true" type="button" class="-m-2.5 p-2.5 text-gray-700 lg:hidden">
+                <i class="fas fa-bars"></i>
+            </button>
+
+            <div class="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
+                <div class="flex flex-1"></div>
+                <div class="flex items-center gap-x-4 lg:gap-x-6">
+                    <!-- Dark mode toggle -->
+                    <button @click="darkMode = !darkMode" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-moon" x-show="!darkMode"></i>
+                        <i class="fas fa-sun" x-show="darkMode" x-cloak></i>
+                    </button>
+
+                    <!-- Notifications -->
+                    <button class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-bell"></i>
+                    </button>
+
+                    <!-- Profile dropdown -->
+                    <div class="relative" x-data="{ open: false }">
+                        <button @click="open = !open" class="flex items-center gap-x-4 text-sm font-medium leading-6 text-gray-900">
+                            <img class="h-8 w-8 rounded-full bg-gray-50" src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="">
+                            <span class="sr-only">Open user menu</span>
+                            {{if .User}}{{.User.Name}}{{else}}Guest{{end}}
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </button>
+                        
+                        <div x-show="open" @click.away="open = false" x-cloak class="absolute right-0 z-10 mt-2.5 w-32 origin-top-right rounded-md bg-white py-2 shadow-lg ring-1 ring-gray-900/5">
+                            <a href="/profile" class="block px-3 py-1 text-sm leading-6 text-gray-900 hover:bg-gray-50">Profile</a>
+                            <a href="/logout" class="block px-3 py-1 text-sm leading-6 text-gray-900 hover:bg-gray-50">Sign out</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page content -->
+        <main class="py-10">
+            <div class="px-4 sm:px-6 lg:px-8">
+                {{template "content" .}}
+            </div>
+        </main>
+    </div>
+
+    <!-- Overlay for mobile -->
+    <div x-show="sidebarOpen" @click="sidebarOpen = false" x-cloak class="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"></div>
+</body>
+</html>

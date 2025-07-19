@@ -6,24 +6,29 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"coolify-go/internal/config"
+	"coolify-go/internal/handlers"
+	"coolify-go/internal/templates"
 	"coolify-go/pkg/database"
 	"coolify-go/pkg/logging"
+
+	"html/template"
 
 	"github.com/gin-gonic/gin"
 )
 
 var (
-	Version   = "v1.4.0"
-	BuildTime = "2025-06-20T11:38:00Z"
-	GitCommit = "azure-registry-v1.4.0"
+	Version   = "v1.4.1"
+	BuildTime = "2025-06-21T18:30:00Z"
+	GitCommit = "a2624e7"
 )
 
 func main() {
-	// Load config
+	// Load config first (from current directory)
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
@@ -41,20 +46,54 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	// Set up database
-	db, err := database.New(&cfg.Database)
-	if err != nil {
-		logger.WithError(err).Warn("Database connection failed. Continuing without DB.")
-	} else {
-		logger.Info("Database connected successfully")
-		if err := db.Migrate(); err != nil {
-			logger.WithError(err).Warn("Database migration failed")
+	// Set up database (optional for development)
+	var db *database.Database
+	if cfg.Database.Host != "localhost" || isDatabaseAvailable(&cfg.Database) {
+		db, err = database.New(&cfg.Database)
+		if err != nil {
+			logger.WithError(err).Warn("Database connection failed. Continuing without DB.")
+		} else {
+			logger.Info("Database connected successfully")
+			if err := db.Migrate(); err != nil {
+				logger.WithError(err).Warn("Database migration failed")
+			}
 		}
+	} else {
+		logger.Info("Database not available or configured for localhost. Continuing without DB.")
+	}
+
+	// Set up template renderer (with fallback for missing templates)
+	var renderer *templates.Renderer
+	if templatesExist() {
+		renderer = templates.NewRenderer()
+	} else {
+		logger.Warn("Templates not found. Using basic renderer.")
+		renderer = templates.NewBasicRenderer()
 	}
 
 	// Set up Gin router
 	r := gin.New()
 	r.Use(gin.Recovery())
+
+	// Load HTML templates only if they exist
+	if templatesExist() {
+		// Define custom template functions
+		funcMap := template.FuncMap{
+			"title": func(s string) string {
+				if len(s) == 0 {
+					return s
+				}
+				return strings.ToUpper(string(s[0])) + s[1:]
+			},
+			"upper": func(s string) string {
+				return strings.ToUpper(s)
+			},
+		}
+
+		// Set template functions and load templates
+		r.SetFuncMap(funcMap)
+		r.LoadHTMLGlob("internal/templates/**/*.html")
+	}
 
 	// Logging middleware
 	r.Use(func(c *gin.Context) {
@@ -69,11 +108,22 @@ func main() {
 		}).Info("request completed")
 	})
 
-	// Routes
-	r.GET("/", func(c *gin.Context) {
-		c.Data(200, "text/html", []byte(homeHTML(Version, BuildTime)))
-	})
+	// Set up web handlers
+	webHandler := handlers.NewWebHandler(renderer)
 
+	// Web routes
+	r.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "/dashboard")
+	})
+	r.GET("/dashboard", webHandler.Dashboard)
+	r.GET("/applications", webHandler.Applications)
+	r.GET("/login", webHandler.Login)
+	r.GET("/register", webHandler.Register)
+
+	// Registration POST handler
+	r.POST("/auth/register", webHandler.RegisterPost)
+
+	// API routes
 	r.GET("/health", func(c *gin.Context) {
 		dbStatus := "not_initialized"
 		if db != nil {
@@ -149,62 +199,35 @@ func (s *httpServer) RunWithGracefulShutdown() {
 	s.Logger.Info("Server exited cleanly")
 }
 
-func homeHTML(version, buildTime string) string {
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Coolify Go</title>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
-        .header { text-align: center; margin-bottom: 2rem; }
-        .status { background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
-        .feature { background: #fefce8; border: 1px solid #eab308; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
-        .code { background: #f1f5f9; padding: 0.5rem; border-radius: 4px; font-family: monospace; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>🚀 Coolify Go</h1>
-        <p>Open-source deployment platform (Go port)</p>
-        <p>Version: %s | Build: %s</p>
-    </div>
-    <div class="status">
-        <h3>📊 System Status</h3>
-        <p><strong>Server:</strong> Running</p>
-        <p><strong>Database:</strong> <span id="db-status">Checking...</span></p>
-        <p><strong>API:</strong> <a href="/health">/health</a></p>
-    </div>
-    <div class="feature">
-        <h3>⚠️ Development Status</h3>
-        <p>This is a minimal Go port of Coolify. Currently implemented:</p>
-        <ul>
-            <li>✅ Basic HTTP server (Gin)</li>
-            <li>✅ Health checks</li>
-            <li>✅ Database connectivity (GORM)</li>
-            <li>⏳ User authentication (coming soon)</li>
-            <li>⏳ Application deployment (coming soon)</li>
-            <li>⏳ Server management (coming soon)</li>
-        </ul>
-    </div>
-    <div class="status">
-        <h3>🛠️ API Endpoints</h3>
-        <p><span class="code">GET /</span> - This page</p>
-        <p><span class="code">GET /health</span> - Health check</p>
-        <p><span class="code">GET /version</span> - Version info</p>
-    </div>
-    <script>
-        fetch('/health')
-            .then(r => r.json())
-            .then(data => {
-                document.getElementById('db-status').textContent = data.database;
-            })
-            .catch(() => {
-                document.getElementById('db-status').textContent = 'error';
-            });
-    </script>
-</body>
-</html>`, version, buildTime)
+// Helper functions
+
+// isDatabaseAvailable checks if database is available for connection
+func isDatabaseAvailable(cfg *config.DatabaseConfig) bool {
+	// For now, just return true if it's not localhost
+	// In a real implementation, you might want to ping the database
+	return cfg.Host != "localhost"
+}
+
+// templatesExist checks if template files exist
+func templatesExist() bool {
+	// Check if the templates directory exists
+	if _, err := os.Stat("internal/templates"); os.IsNotExist(err) {
+		return false
+	}
+
+	// Check if at least one of the expected template files exists
+	expectedFiles := []string{
+		"internal/templates/layouts/base.html",
+		"internal/templates/pages/dashboard.html",
+		"internal/templates/pages/applications.html",
+		"internal/templates/pages/login.html",
+	}
+
+	for _, file := range expectedFiles {
+		if _, err := os.Stat(file); err == nil {
+			return true
+		}
+	}
+
+	return false
 }

@@ -1,0 +1,229 @@
+{{define "content"}}
+<div class="space-y-6">
+  <!-- Page header -->
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+    <p class="mt-1 text-sm text-gray-500">
+      Welcome back! Here's what's happening with your applications.
+    </p>
+  </div>
+
+  <!-- Stats cards -->
+  <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+      <div class="p-5">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <div
+              class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center"
+            >
+              <i class="fas fa-cube text-white text-sm"></i>
+            </div>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">
+                Applications
+              </dt>
+              <dd class="text-lg font-medium text-gray-900">
+                {{.Stats.Applications}}
+              </dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+      <div class="p-5">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <div
+              class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center"
+            >
+              <i class="fas fa-server text-white text-sm"></i>
+            </div>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">
+                Servers
+              </dt>
+              <dd class="text-lg font-medium text-gray-900">
+                {{.Stats.Servers}}
+              </dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+      <div class="p-5">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <div
+              class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center"
+            >
+              <i class="fas fa-rocket text-white text-sm"></i>
+            </div>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">
+                Deployments
+              </dt>
+              <dd class="text-lg font-medium text-gray-900">
+                {{.Stats.Deployments}}
+              </dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+      <div class="p-5">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <div
+              class="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center"
+            >
+              <i class="fas fa-users text-white text-sm"></i>
+            </div>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">
+                Team Members
+              </dt>
+              <dd class="text-lg font-medium text-gray-900">
+                {{.Stats.TeamMembers}}
+              </dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent deployments -->
+  <div class="bg-white shadow rounded-lg">
+    <div class="px-4 py-5 sm:p-6">
+      <h3 class="text-lg leading-6 font-medium text-gray-900">
+        Recent Deployments
+      </h3>
+      <div class="mt-6 flow-root">
+        <ul class="-my-5 divide-y divide-gray-200">
+          {{range .RecentDeployments}}
+          <li class="py-4">
+            <div class="flex items-center space-x-4">
+              <div class="flex-shrink-0">
+                {{if eq .Status "success"}}
+                <div
+                  class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center"
+                >
+                  <i class="fas fa-check text-green-600 text-sm"></i>
+                </div>
+                {{else if eq .Status "failed"}}
+                <div
+                  class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center"
+                >
+                  <i class="fas fa-times text-red-600 text-sm"></i>
+                </div>
+                {{else}}
+                <div
+                  class="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center"
+                >
+                  <i class="fas fa-clock text-yellow-600 text-sm"></i>
+                </div>
+                {{end}}
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-900 truncate">
+                  {{.ApplicationName}}
+                </p>
+                <p class="text-sm text-gray-500">Commit {{.CommitHash}}</p>
+              </div>
+              <div class="flex-shrink-0 text-sm text-gray-500">
+                {{.CreatedAt}}
+              </div>
+            </div>
+          </li>
+          {{end}}
+        </ul>
+      </div>
+      <div class="mt-6">
+        <a
+          href="/applications"
+          class="w-full flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+        >
+          View all applications
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="bg-white shadow rounded-lg">
+    <div class="px-4 py-5 sm:p-6">
+      <h3 class="text-lg leading-6 font-medium text-gray-900">Quick Actions</h3>
+      <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <a
+          href="/applications/new"
+          class="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+        >
+          <div class="flex-shrink-0">
+            <div
+              class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center"
+            >
+              <i class="fas fa-plus text-white text-sm"></i>
+            </div>
+          </div>
+          <div class="flex-1 min-w-0">
+            <span class="absolute inset-0" aria-hidden="true"></span>
+            <p class="text-sm font-medium text-gray-900">New Application</p>
+            <p class="text-sm text-gray-500">Deploy a new application</p>
+          </div>
+        </a>
+
+        <a
+          href="/servers/new"
+          class="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+        >
+          <div class="flex-shrink-0">
+            <div
+              class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center"
+            >
+              <i class="fas fa-server text-white text-sm"></i>
+            </div>
+          </div>
+          <div class="flex-1 min-w-0">
+            <span class="absolute inset-0" aria-hidden="true"></span>
+            <p class="text-sm font-medium text-gray-900">Add Server</p>
+            <p class="text-sm text-gray-500">Connect a new server</p>
+          </div>
+        </a>
+
+        <a
+          href="/teams/new"
+          class="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+        >
+          <div class="flex-shrink-0">
+            <div
+              class="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center"
+            >
+              <i class="fas fa-users text-white text-sm"></i>
+            </div>
+          </div>
+          <div class="flex-1 min-w-0">
+            <span class="absolute inset-0" aria-hidden="true"></span>
+            <p class="text-sm font-medium text-gray-900">Create Team</p>
+            <p class="text-sm text-gray-500">Set up team collaboration</p>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}

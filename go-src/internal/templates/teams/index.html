@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teams - Coolify</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="h-full bg-gray-50 dark:bg-gray-900">
+    <div class="min-h-full">
+        <!-- Navigation -->
+        <nav class="bg-white dark:bg-gray-800 shadow">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <h1 class="text-xl font-semibold text-gray-900 dark:text-white">
+                            Teams
+                        </h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button 
+                            @click="$refs.createModal.style.display = 'flex'"
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        >
+                            <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                            </svg>
+                            Create Team
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main content -->
+        <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <div class="px-4 py-6 sm:px-0">
+                <!-- Teams grid -->
+                <div 
+                    x-data="{ teams: [], loading: true, error: null }"
+                    x-init="
+                        fetch('/api/teams')
+                            .then(response => response.json())
+                            .then(data => {
+                                teams = data.data || [];
+                                loading = false;
+                            })
+                            .catch(err => {
+                                error = 'Failed to load teams';
+                                loading = false;
+                            })
+                    "
+                >
+                    <!-- Loading state -->
+                    <div x-show="loading" class="text-center py-12">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading teams...</p>
+                    </div>
+
+                    <!-- Error state -->
+                    <div x-show="error" class="rounded-md bg-red-50 dark:bg-red-900 p-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-red-800 dark:text-red-200" x-text="error"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Teams grid -->
+                    <div x-show="!loading && !error" class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                        <template x-for="team in teams" :key="team.id">
+                            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                                <div class="p-6">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0">
+                                            <div class="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
+                                                <span class="text-sm font-medium text-white" x-text="team.name.charAt(0).toUpperCase()"></span>
+                                            </div>
+                                        </div>
+                                        <div class="ml-4 flex-1">
+                                            <h3 class="text-lg font-medium text-gray-900 dark:text-white" x-text="team.name"></h3>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400" x-text="team.description || 'No description'"></p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mt-4">
+                                        <div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                                            <svg class="flex-shrink-0 mr-1.5 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                                            </svg>
+                                            <span x-text="(team.members || []).length + ' members'"></span>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-6 flex justify-between">
+                                        <a 
+                                            :href="`/teams/${team.id}`"
+                                            class="text-blue-600 hover:text-blue-500 text-sm font-medium"
+                                        >
+                                            View team →
+                                        </a>
+                                        <div class="flex space-x-2">
+                                            <button 
+                                                @click="editTeam(team)"
+                                                class="text-gray-400 hover:text-gray-500"
+                                            >
+                                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Empty state -->
+                    <div x-show="!loading && !error && teams.length === 0" class="text-center py-12">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 48 48">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h10m-7 4h4m1-4V8a1 1 0 011-1h2a1 1 0 011 1v12a4 4 0 01-4 4H9a4 4 0 01-4-4V8a1 1 0 011-1h2a1 1 0 011 1v4a4 4 0 014 4z"/>
+                        </svg>
+                        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No teams</h3>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by creating a new team.</p>
+                        <div class="mt-6">
+                            <button 
+                                @click="$refs.createModal.style.display = 'flex'"
+                                class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            >
+                                <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                </svg>
+                                New Team
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Create Team Modal -->
+    <div 
+        x-ref="createModal"
+        class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+        style="display: none;"
+        @click.self="$refs.createModal.style.display = 'none'"
+    >
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div class="mt-3">
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Create New Team</h3>
+                
+                <form 
+                    x-data="{ 
+                        name: '', 
+                        description: '', 
+                        submitting: false,
+                        error: null
+                    }"
+                    @submit.prevent="
+                        submitting = true;
+                        error = null;
+                        fetch('/api/teams', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name, description })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.error) {
+                                error = data.error;
+                            } else {
+                                $refs.createModal.style.display = 'none';
+                                location.reload();
+                            }
+                        })
+                        .catch(err => {
+                            error = 'Failed to create team';
+                        })
+                        .finally(() => {
+                            submitting = false;
+                        })
+                    "
+                >
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Team Name
+                        </label>
+                        <input 
+                            x-model="name"
+                            type="text" 
+                            required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            placeholder="Enter team name"
+                        >
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Description (optional)
+                        </label>
+                        <textarea 
+                            x-model="description"
+                            rows="3"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            placeholder="Enter team description"
+                        ></textarea>
+                    </div>
+
+                    <div x-show="error" class="mb-4 text-sm text-red-600 dark:text-red-400" x-text="error"></div>
+                    
+                    <div class="flex justify-end space-x-2">
+                        <button 
+                            type="button"
+                            @click="$refs.createModal.style.display = 'none'"
+                            class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            type="submit"
+                            :disabled="submitting || !name.trim()"
+                            class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <span x-show="!submitting">Create Team</span>
+                            <span x-show="submitting">Creating...</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,154 @@
+{{define "content"}}
+<div
+  class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8"
+>
+  <div class="max-w-md w-full space-y-8">
+    <div>
+      <div
+        class="mx-auto h-12 w-12 bg-blue-600 rounded-lg flex items-center justify-center"
+      >
+        <i class="fas fa-cloud text-white text-xl"></i>
+      </div>
+      <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+        Sign in to Coolify Go
+      </h2>
+      <p class="mt-2 text-center text-sm text-gray-600">
+        Deploy and manage your applications with ease
+      </p>
+    </div>
+
+    <div class="mt-8 space-y-6">
+      <!-- OAuth Providers -->
+      <div class="space-y-4">
+        {{range .Providers}}
+        <a
+          href="{{.URL}}"
+          class="group relative w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+            <i
+              class="fab fa-{{.Icon}} text-gray-400 group-hover:text-gray-500"
+            ></i>
+          </span>
+          Continue with {{.Name}}
+        </a>
+        {{end}}
+      </div>
+
+      <!-- Divider -->
+      <div class="relative">
+        <div class="absolute inset-0 flex items-center">
+          <div class="w-full border-t border-gray-300"></div>
+        </div>
+        <div class="relative flex justify-center text-sm">
+          <span class="px-2 bg-gray-50 text-gray-500">Or continue with</span>
+        </div>
+      </div>
+
+      <!-- Email/Password Form -->
+      <form class="mt-6 space-y-6" action="/auth/login" method="POST">
+        <div>
+          <label for="email" class="block text-sm font-medium text-gray-700">
+            Email address
+          </label>
+          <div class="mt-1">
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autocomplete="email"
+              required
+              class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              placeholder="Enter your email"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label for="password" class="block text-sm font-medium text-gray-700">
+            Password
+          </label>
+          <div class="mt-1">
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              required
+              class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              placeholder="Enter your password"
+            />
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <div class="flex items-center">
+            <input
+              id="remember-me"
+              name="remember-me"
+              type="checkbox"
+              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label for="remember-me" class="ml-2 block text-sm text-gray-900">
+              Remember me
+            </label>
+          </div>
+
+          <div class="text-sm">
+            <a
+              href="/forgot-password"
+              class="font-medium text-blue-600 hover:text-blue-500"
+            >
+              Forgot your password?
+            </a>
+          </div>
+        </div>
+
+        <div>
+          <button
+            type="submit"
+            class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+              <i
+                class="fas fa-sign-in-alt text-blue-500 group-hover:text-blue-400"
+              ></i>
+            </span>
+            Sign in
+          </button>
+        </div>
+      </form>
+
+      <div class="text-center">
+        <p class="text-sm text-gray-600">
+          Don't have an account?
+          <a
+            href="/register"
+            class="font-medium text-blue-600 hover:text-blue-500"
+          >
+            Sign up
+          </a>
+        </p>
+      </div>
+
+      <!-- Demo mode notice -->
+      <div class="mt-6 bg-yellow-50 border border-yellow-200 rounded-md p-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <i class="fas fa-info-circle text-yellow-400"></i>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-yellow-800">Demo Mode</h3>
+            <div class="mt-2 text-sm text-yellow-700">
+              <p>
+                This is a demo environment. Authentication is simulated for
+                development purposes.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}

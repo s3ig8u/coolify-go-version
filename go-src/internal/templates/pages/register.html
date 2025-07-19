@@ -1,0 +1,183 @@
+{{define "register.html"}} {{template "base.html" .}} {{end}} {{define
+"content"}}
+<div
+  class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8"
+>
+  <div class="max-w-md w-full space-y-8">
+    <div>
+      <div
+        class="mx-auto h-12 w-12 bg-blue-600 rounded-lg flex items-center justify-center"
+      >
+        <i class="fas fa-cloud text-white text-xl"></i>
+      </div>
+      <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+        Create your account
+      </h2>
+      <p class="mt-2 text-center text-sm text-gray-600">
+        Join Coolify Go to deploy and manage your applications
+      </p>
+    </div>
+
+    <div class="mt-8 space-y-6">
+      <div class="space-y-4">
+        {{range .Providers}}
+        <a
+          href="{{.URL}}"
+          class="group relative w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+            <i
+              class="fab fa-{{.Icon}} text-gray-400 group-hover:text-gray-500"
+            ></i>
+          </span>
+          Continue with {{.Name}}
+        </a>
+        {{end}}
+      </div>
+
+      <div class="flex items-center my-6">
+        <div class="flex-grow border-t border-gray-300"></div>
+        <span class="mx-4 text-sm text-gray-500 bg-gray-50 px-2"
+          >Or register with email</span
+        >
+        <div class="flex-grow border-t border-gray-300"></div>
+      </div>
+
+      <form class="space-y-6" action="/auth/register" method="POST">
+        <div>
+          <label for="name" class="block text-sm font-medium text-gray-700">
+            Full Name
+          </label>
+          <div class="mt-1">
+            <input
+              id="name"
+              name="name"
+              type="text"
+              required
+              class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 sm:text-sm"
+              placeholder="Enter your full name"
+              value="{{with .Form.name}}{{.}}{{end}}"
+            />
+          </div>
+          {{with index .Errors "name"}}
+          <p class="mt-1 text-sm text-red-600">{{.}}</p>
+          {{end}}
+        </div>
+
+        <div>
+          <label for="email" class="block text-sm font-medium text-gray-700">
+            Email address
+          </label>
+          <div class="mt-1">
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autocomplete="email"
+              required
+              class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 sm:text-sm"
+              placeholder="Enter your email"
+              value="{{with .Form.email}}{{.}}{{end}}"
+            />
+          </div>
+          {{with index .Errors "email"}}
+          <p class="mt-1 text-sm text-red-600">{{.}}</p>
+          {{end}}
+        </div>
+
+        <div>
+          <label for="password" class="block text-sm font-medium text-gray-700">
+            Password
+          </label>
+          <div class="mt-1">
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autocomplete="new-password"
+              required
+              class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 sm:text-sm"
+              placeholder="Create a password"
+            />
+          </div>
+          {{with index .Errors "password"}}
+          <p class="mt-1 text-sm text-red-600">{{.}}</p>
+          {{end}}
+        </div>
+
+        <div>
+          <label
+            for="confirm-password"
+            class="block text-sm font-medium text-gray-700"
+          >
+            Confirm Password
+          </label>
+          <div class="mt-1">
+            <input
+              id="confirm-password"
+              name="confirm-password"
+              type="password"
+              autocomplete="new-password"
+              required
+              class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 sm:text-sm"
+              placeholder="Confirm your password"
+            />
+          </div>
+          {{with index .Errors "confirm-password"}}
+          <p class="mt-1 text-sm text-red-600">{{.}}</p>
+          {{end}}
+        </div>
+
+        <div class="flex items-center">
+          <input
+            id="agree-terms"
+            name="agree-terms"
+            type="checkbox"
+            required
+            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <label for="agree-terms" class="ml-2 block text-sm text-gray-900">
+            I agree to the
+            <a href="/terms" class="text-blue-600 hover:text-blue-500"
+              >Terms of Service</a
+            >
+            and
+            <a href="/privacy" class="text-blue-600 hover:text-blue-500"
+              >Privacy Policy</a
+            >
+          </label>
+        </div>
+        {{with index .Errors "agree-terms"}}
+        <p class="mt-1 text-sm text-red-600">{{.}}</p>
+        {{end}}
+
+        <div>
+          <button
+            type="submit"
+            class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+              <i
+                class="fas fa-user-plus text-blue-500 group-hover:text-blue-400"
+              ></i>
+            </span>
+            Create Account
+          </button>
+        </div>
+      </form>
+
+      <div class="text-center">
+        <p class="text-sm text-gray-600">
+          Already have an account?
+          <a
+            href="/login"
+            class="font-medium text-blue-600 hover:text-blue-500"
+          >
+            Sign in
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}

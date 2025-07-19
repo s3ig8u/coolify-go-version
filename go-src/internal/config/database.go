@@ -45,17 +45,19 @@ func ConnectDatabase(dbConfig DatabaseConfig) error {
 func AutoMigrate() error {
 	log.Println("Running database migrations...")
 
-	// Run GORM auto-migration
+	// Run GORM auto-migration for all models
 	err := DB.AutoMigrate(
 		&models.User{},
 		&models.Team{},
+		&models.TeamMember{},
+		&models.TeamInvitation{},
 		&models.Server{},
 		&models.Application{},
 		&models.SchemaHash{},
 	)
 
 	if err != nil {
-		return fmt.Errorf("failed to run migrations: %w", err)
+		return fmt.Errorf("failed to run auto-migrations: %w", err)
 	}
 
 	// Validate schema hash
@@ -68,8 +70,8 @@ func AutoMigrate() error {
 		log.Printf("Schema hash mismatch detected. Expected: %s", expectedHash)
 
 		// Save new schema hash
-		modelNames := []string{"User", "Team", "Server", "Application", "SchemaHash"}
-		err = models.SaveSchemaHash(DB, expectedHash, "v1.0.0", modelNames)
+		modelNames := []string{"User", "Team", "TeamMember", "TeamInvitation", "Server", "Application", "SchemaHash"}
+		err = models.SaveSchemaHash(DB, expectedHash, "v1.4.0", modelNames)
 		if err != nil {
 			return fmt.Errorf("failed to save schema hash: %w", err)
 		}
